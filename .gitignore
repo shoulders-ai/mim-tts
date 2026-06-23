@@ -1,0 +1,41 @@
+# Dependencies
+/node_modules/
+
+# Frontend output
+/dist/
+/dist-ssr/
+
+# Rust / Tauri output
+/src-tauri/target/
+/src-tauri/gen/schemas/
+/src-tauri/bundle/
+
+# Local config and secrets
+/.env
+/.env.*
+!.env.example
+*.local
+
+# Runtime data
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.bin
+/models/
+/history.db
+/settings.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editor / OS
+/.cargo/
+/.vscode/
+/.idea/
+.DS_Store
+*.sw?

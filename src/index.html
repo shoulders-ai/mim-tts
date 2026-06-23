@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mim TTS</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./main.js" defer></script>
+  </head>
+  <body class="panel-shell">
+    <main class="panel" data-state="idle">
+      <header class="panel-header">
+        <div class="status-cluster">
+          <span class="status-dot" aria-hidden="true"></span>
+          <div>
+            <div id="status-label" class="status-label">Mim TTS</div>
+            <div id="status-detail" class="status-detail"></div>
+          </div>
+        </div>
+        <button id="record-toggle" class="icon-button primary" type="button" title="Record">
+          <span class="record-glyph" aria-hidden="true"></span>
+        </button>
+      </header>
+
+      <section class="control-stack" aria-label="Dictation controls">
+        <div class="control-grid">
+          <label class="field">
+            <span>Model</span>
+            <select id="model-select">
+              <option value="tiny">tiny</option>
+              <option value="base">base</option>
+              <option value="small">small</option>
+            </select>
+          </label>
+          <div class="field language-picker">
+            <span>Lang</span>
+            <button id="language-button" class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span id="language-value">de/en</span>
+            </button>
+            <div id="language-menu" class="language-menu" hidden>
+              <div id="language-list" class="language-list" role="listbox" aria-label="Languages"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="preference-row">
+          <button id="hotkey-record" class="hotkey-record" type="button">
+            <span>
+              <span class="control-eyebrow">Hotkey</span>
+              <span id="hotkey-value">Command+Shift+Space</span>
+            </span>
+            <span id="hotkey-action">Record</span>
+          </button>
+          <div class="segmented inline-segmented" role="group" aria-label="Activation mode">
+            <button id="mode-hold" type="button" data-mode="hold">Hold</button>
+            <button id="mode-toggle" type="button" data-mode="toggle">Tap</button>
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <button id="auto-paste-toggle" class="toggle-pill" type="button" aria-pressed="true">Paste</button>
+          <button id="audio-cues-toggle" class="toggle-pill" type="button" aria-pressed="true">Sound</button>
+        </div>
+      </section>
+
+      <section class="history-wrap" aria-label="Transcription history">
+        <div id="model-gate" class="model-gate" hidden>
+          <div>
+            <div id="model-gate-title" class="model-gate-title">Download model</div>
+            <div id="model-gate-detail" class="model-gate-detail">A local Whisper model is required before recording.</div>
+          </div>
+          <button id="model-download-button" class="model-download-button" type="button">Download</button>
+          <div id="model-download-track" class="model-download-track" aria-hidden="true">
+            <span id="model-download-fill"></span>
+          </div>
+          <div id="model-download-progress" class="model-download-progress"></div>
+        </div>
+        <div id="empty-history" class="empty-state">No transcriptions yet</div>
+        <div id="history-list" class="history-list"></div>
+      </section>
+
+    </main>
+  </body>
+</html>

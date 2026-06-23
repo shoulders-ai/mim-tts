@@ -1,0 +1,283 @@
+mod audio;
+mod commands;
+mod db;
+mod fn_hotkey;
+mod models;
+mod paste;
+mod settings;
+mod state;
+mod transcribe;
+
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager,
+};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_positioner::{Position, WindowExt};
+
+use state::AppState;
+
+const TRAY_ID: &str = "mim-tts-tray";
+const DEFAULT_SHORTCUT: &str = "CommandOrControl+Shift+Space";
+const FALLBACK_SHORTCUTS: &[&str] = &[DEFAULT_SHORTCUT, "F8", "F9", "Control+Shift+Space"];
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    whisper_rs::install_logging_hooks();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_positioner::init())
+        .setup(|app| {
+            let state = AppState::new()?;
+            app.manage(state);
+
+            app.handle().plugin(
+                tauri_plugin_global_shortcut::Builder::new()
+                    .with_handler(|app, _shortcut, event| match event.state() {
+                        ShortcutState::Pressed | ShortcutState::Released => {
+                            commands::handle_shortcut(app.clone(), event.state());
+                        }
+                    })
+                    .build(),
+            )?;
+
+            register_first_available_shortcut(app.handle());
+            fn_hotkey::start(app.handle());
+            build_tray(app)?;
+            if should_show_panel_on_start(app) {
+                toggle_panel(app.handle());
+            }
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::start_recording,
+            commands::stop_recording,
+            commands::is_recording,
+            commands::get_history,
+            commands::delete_history_item,
+            commands::clear_history,
+            commands::get_settings,
+            commands::set_model,
+            commands::set_languages,
+            commands::set_hotkey,
+            commands::begin_hotkey_capture,
+            commands::cancel_hotkey_capture,
+            commands::set_activation_mode,
+            commands::set_audio_cues,
+            commands::set_auto_paste,
+            commands::get_model_status,
+            commands::download_model,
+            commands::copy_text,
+            commands::hide_panel,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+
+fn build_tray(app: &mut tauri::App) -> tauri::Result<()> {
+    let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
+    let icon = app.default_window_icon().cloned();
+
+    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
+        .tooltip("Mim TTS")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .icon_as_template(true)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "show" => toggle_panel(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
+            if matches!(
+                event,
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                }
+            ) {
+                toggle_panel(tray.app_handle());
+            }
+        });
+
+    if let Some(icon) = icon {
+        builder = builder.icon(icon);
+    }
+
+    builder.build(app)?;
+    Ok(())
+}
+
+fn should_show_panel_on_start(app: &tauri::App) -> bool {
+    let state = app.state::<AppState>();
+    let model = state
+        .settings
+        .lock()
+        .ok()
+        .map(|settings| settings.model.clone());
+
+    model
+        .as_deref()
+        .map(|model| !models::is_installed(&state.app_dir, model).unwrap_or(false))
+        .unwrap_or(false)
+}
+
+pub(crate) fn toggle_panel(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let visible = window.is_visible().unwrap_or(false);
+        if visible {
+            let _ = window.hide();
+            return;
+        }
+
+        let _ = window
+            .as_ref()
+            .window()
+            .move_window(Position::TrayBottomCenter);
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+pub(crate) fn set_tray_busy(app: &tauri::AppHandle, busy: bool) {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let title = if busy { Some("REC") } else { None };
+        let _ = tray.set_title(title);
+        let _ = tray.set_tooltip(Some(if busy {
+            "Mim TTS is recording"
+        } else {
+            "Mim TTS"
+        }));
+    }
+}
+
+fn register_first_available_shortcut(app: &tauri::AppHandle) {
+    let preferred = app
+        .try_state::<AppState>()
+        .and_then(|state| {
+            state
+                .settings
+                .lock()
+                .ok()
+                .map(|settings| settings.hotkey.clone())
+        })
+        .unwrap_or_else(|| DEFAULT_SHORTCUT.to_string());
+
+    if fn_hotkey::is_fn_hotkey(&preferred) {
+        let _ = app.global_shortcut().register(DEFAULT_SHORTCUT);
+        return;
+    }
+
+    for candidate in shortcut_candidates(&preferred) {
+        if app.global_shortcut().register(candidate.as_str()).is_ok() {
+            if let Some(state) = app.try_state::<AppState>() {
+                let _ = state.update_hotkey(candidate);
+            }
+            break;
+        }
+    }
+}
+
+pub(crate) fn replace_registered_shortcut(
+    app: &tauri::AppHandle,
+    current: &str,
+    next: &str,
+) -> anyhow::Result<String> {
+    let next = normalize_shortcut(next);
+    let current = normalize_shortcut(current);
+
+    if fn_hotkey::is_fn_hotkey(&next) {
+        if !fn_hotkey::is_fn_hotkey(&current) && current != DEFAULT_SHORTCUT {
+            let _ = app.global_shortcut().unregister(current.as_str());
+        }
+        let _ = app.global_shortcut().register(DEFAULT_SHORTCUT);
+        return Ok("Fn".to_string());
+    }
+
+    if fn_hotkey::is_fn_hotkey(&current) {
+        if !app.global_shortcut().is_registered(next.as_str()) {
+            app.global_shortcut().register(next.as_str())?;
+        }
+        if next != DEFAULT_SHORTCUT {
+            let _ = app.global_shortcut().unregister(DEFAULT_SHORTCUT);
+        }
+        return Ok(next);
+    }
+
+    if current == next && app.global_shortcut().is_registered(current.as_str()) {
+        return Ok(next);
+    }
+
+    app.global_shortcut().register(next.as_str())?;
+    if current != next {
+        let _ = app.global_shortcut().unregister(current.as_str());
+    }
+
+    Ok(next)
+}
+
+fn shortcut_candidates(preferred: &str) -> Vec<String> {
+    let mut candidates = vec![normalize_shortcut(preferred)];
+    for fallback in FALLBACK_SHORTCUTS {
+        if !candidates.iter().any(|candidate| candidate == fallback) {
+            candidates.push((*fallback).to_string());
+        }
+    }
+    candidates
+}
+
+fn normalize_shortcut(shortcut: &str) -> String {
+    let shortcut = shortcut.trim();
+    if let Some(shortcut) = fn_hotkey::normalize_fn_hotkey(shortcut) {
+        return shortcut;
+    }
+    if shortcut.is_empty() {
+        DEFAULT_SHORTCUT.to_string()
+    } else {
+        shortcut.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shortcut_candidates_try_preferred_first() {
+        let candidates = shortcut_candidates("F10");
+        assert_eq!(candidates.first().map(String::as_str), Some("F10"));
+        assert!(candidates
+            .iter()
+            .any(|candidate| candidate == DEFAULT_SHORTCUT));
+    }
+
+    #[test]
+    fn shortcut_candidates_deduplicate_default() {
+        let candidates = shortcut_candidates(DEFAULT_SHORTCUT);
+        let default_count = candidates
+            .iter()
+            .filter(|candidate| candidate.as_str() == DEFAULT_SHORTCUT)
+            .count();
+        assert_eq!(default_count, 1);
+    }
+
+    #[test]
+    fn normalize_shortcut_uses_default_for_blank_values() {
+        assert_eq!(normalize_shortcut("  "), DEFAULT_SHORTCUT);
+        assert_eq!(normalize_shortcut(" F8 "), "F8");
+    }
+
+    #[test]
+    fn normalize_shortcut_preserves_fn_hotkey_aliases() {
+        assert_eq!(normalize_shortcut("fn"), "Fn");
+        assert_eq!(normalize_shortcut("Globe"), "Fn");
+        assert_eq!(normalize_shortcut("Function"), "Fn");
+    }
+}
