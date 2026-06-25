@@ -69,10 +69,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
 
-      - name: Install Azure Code Signing (Windows)
+      - name: Install Azure Trusted Signing (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: dotnet tool install --global Azure.CodeSigning.Dlib --version 1.0.52
+        run: |
+          nuget install Microsoft.Trusted.Signing.Client -Version 1.0.60 -OutputDirectory "${{ runner.temp }}\signing"
+          $dll = Get-ChildItem -Recurse "${{ runner.temp }}\signing" -Filter "Azure.CodeSigning.Dlib.dll" |
+                 Where-Object { $_.FullName -match 'x64' } |
+                 Select-Object -First 1 -ExpandProperty FullName
+          echo "AZURE_DLIB_PATH=$dll" >> $env:GITHUB_ENV
 
       - run: npm ci
 

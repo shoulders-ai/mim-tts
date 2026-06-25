@@ -5,8 +5,13 @@ if (-not $env:AZURE_CLIENT_ID) {
     exit 0
 }
 
-$dlibPath = Join-Path $env:USERPROFILE ".dotnet\tools\.store\azure.codesigning.dlib\1.0.52\azure.codesigning.dlib\1.0.52\tools\net8.0\any\Azure.CodeSigning.Dlib.dll"
+$dlib = $env:AZURE_DLIB_PATH
+if (-not $dlib -or -not (Test-Path $dlib)) {
+    Write-Host "Azure.CodeSigning.Dlib.dll not found at '$dlib' - skipping"
+    exit 0
+}
+
 $metadata = Join-Path $PSScriptRoot "azure-signing-metadata.json"
 
-& signtool.exe sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib $dlibPath /dmdf $metadata $FilePath
+& signtool.exe sign /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib $dlib /dmdf $metadata $FilePath
 if ($LASTEXITCODE -ne 0) { throw "Signing failed for $FilePath (exit $LASTEXITCODE)" }
