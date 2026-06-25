@@ -88,7 +88,13 @@ fn build_tray(app: &mut tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
-    let icon = app.default_window_icon().cloned();
+
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon@2x.png"))
+        .or_else(|_| {
+            app.default_window_icon()
+                .cloned()
+                .ok_or(tauri::Error::AssetNotFound("tray icon".into()))
+        })?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("Mim TTS")
@@ -114,10 +120,7 @@ fn build_tray(app: &mut tauri::App) -> tauri::Result<()> {
             }
         });
 
-    if let Some(icon) = icon {
-        builder = builder.icon(icon);
-    }
-
+    builder = builder.icon(icon);
     builder.build(app)?;
     Ok(())
 }

@@ -60,16 +60,27 @@
 
         <div class="option-list">
           <button id="auto-paste-toggle" class="option-row" type="button" aria-pressed="true">
-            <span class="option-dot"></span>
             <span class="option-label">Paste after dictation</span>
+            <span class="option-switch"></span>
           </button>
           <button id="audio-cues-toggle" class="option-row" type="button" aria-pressed="true">
-            <span class="option-dot"></span>
             <span class="option-label">Play sound effects</span>
+            <span class="option-switch"></span>
           </button>
           <button id="mute-toggle" class="option-row" type="button" aria-pressed="false">
-            <span class="option-dot"></span>
             <span class="option-label">Mute audio while recording</span>
+            <span class="option-switch"></span>
+          </button>
+
+          <div class="option-divider"></div>
+
+          <button id="perm-mic" class="option-row option-perm" type="button">
+            <span class="option-label">Microphone access</span>
+            <span class="perm-badge">Grant</span>
+          </button>
+          <button id="perm-acc" class="option-row option-perm" type="button">
+            <span class="option-label">Keyboard access</span>
+            <span class="perm-badge">Open Settings</span>
           </button>
         </div>
       </section>
@@ -103,15 +114,6 @@
           </div>
         </div>
       </section>
-
-      <footer id="permission-bar" class="permission-bar" hidden>
-        <button id="perm-mic" class="perm-chip" type="button" title="Microphone">
-          <span class="perm-dot"></span>Mic
-        </button>
-        <button id="perm-acc" class="perm-chip" type="button" title="Accessibility">
-          <span class="perm-dot"></span>Keys
-        </button>
-      </footer>
 
     </main>
   </body>

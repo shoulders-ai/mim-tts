@@ -120,18 +120,21 @@ async function checkPermissions() {
 }
 
 function updatePermissionUI(perms) {
-  const bar = document.getElementById("permission-bar");
-  const micChip = document.getElementById("perm-mic");
-  const accChip = document.getElementById("perm-acc");
-  if (!bar) return;
+  const micRow = document.getElementById("perm-mic");
+  const accRow = document.getElementById("perm-acc");
 
-  const micOk = perms.microphone === "authorized";
-  const accOk = perms.accessibility;
-
-  bar.hidden = micOk && accOk;
-
-  if (micChip) micChip.dataset.status = micOk ? "granted" : perms.microphone;
-  if (accChip) accChip.dataset.status = accOk ? "granted" : "needed";
+  if (micRow) {
+    const micOk = perms.microphone === "authorized";
+    micRow.dataset.status = micOk ? "granted" : perms.microphone;
+    const badge = micRow.querySelector(".perm-badge");
+    if (badge) badge.textContent = micOk ? "Granted" : perms.microphone === "not_determined" ? "Grant" : "Open Settings";
+  }
+  if (accRow) {
+    const accOk = perms.accessibility;
+    accRow.dataset.status = accOk ? "granted" : "needed";
+    const badge = accRow.querySelector(".perm-badge");
+    if (badge) badge.textContent = accOk ? "Granted" : "Open Settings";
+  }
 }
 
 async function grantMicPermission() {
