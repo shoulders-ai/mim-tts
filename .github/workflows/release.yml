@@ -69,35 +69,36 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
 
-      - name: Install Azure Trusted Signing (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          nuget install Microsoft.Trusted.Signing.Client -Version 1.0.60 -OutputDirectory "${{ runner.temp }}\signing"
-          $dll = Get-ChildItem -Recurse "${{ runner.temp }}\signing" -Filter "Azure.CodeSigning.Dlib.dll" |
-                 Where-Object { $_.FullName -match 'x64' } |
-                 Select-Object -First 1 -ExpandProperty FullName
-          echo "AZURE_DLIB_PATH=$dll" >> $env:GITHUB_ENV
-
       - run: npm ci
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS signing & notarization
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Windows Azure Trusted Signing
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         with:
           args: ${{ matrix.build_args }}
+
+      - name: Sign Windows artifacts
+        if: runner.os == 'Windows' && secrets.AZURE_CLIENT_ID != ''
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: https://plc.codesigning.azure.net/
+          trusted-signing-account-name: shoulders
+          certificate-profile-name: mim-1
+          files-folder: src-tauri/target/release/bundle
+          files-folder-filter: exe,msi
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Upload artifacts
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}

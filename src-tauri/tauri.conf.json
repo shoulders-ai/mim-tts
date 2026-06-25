@@ -43,7 +43,6 @@
       "minimumSystemVersion": "11.0"
     },
     "windows": {
-      "signCommand": "pwsh -File ../scripts/sign-windows.ps1 \"%1\""
     }
   }
 }
