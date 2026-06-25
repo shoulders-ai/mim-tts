@@ -58,14 +58,23 @@
           </div>
         </div>
 
-        <div class="toggle-row">
-          <button id="auto-paste-toggle" class="toggle-pill" type="button" aria-pressed="true">Paste</button>
-          <button id="audio-cues-toggle" class="toggle-pill" type="button" aria-pressed="true">Sound</button>
-          <button id="mute-toggle" class="toggle-pill" type="button" aria-pressed="false" title="Mute system audio while recording">Mute</button>
+        <div class="option-list">
+          <button id="auto-paste-toggle" class="option-row" type="button" aria-pressed="true">
+            <span class="option-dot"></span>
+            <span class="option-label">Paste after dictation</span>
+          </button>
+          <button id="audio-cues-toggle" class="option-row" type="button" aria-pressed="true">
+            <span class="option-dot"></span>
+            <span class="option-label">Play sound effects</span>
+          </button>
+          <button id="mute-toggle" class="option-row" type="button" aria-pressed="false">
+            <span class="option-dot"></span>
+            <span class="option-label">Mute audio while recording</span>
+          </button>
         </div>
       </section>
 
-      <section class="history-wrap" aria-label="Transcription history">
+      <section class="lower-section">
         <div id="model-gate" class="model-gate" hidden>
           <div>
             <div id="model-gate-title" class="model-gate-title">Download model</div>
@@ -77,9 +86,22 @@
           </div>
           <div id="model-download-progress" class="model-download-progress"></div>
         </div>
-        <div id="dictation-stats" class="dictation-stats" hidden></div>
-        <div id="empty-history" class="empty-state">No transcriptions yet</div>
-        <div id="history-list" class="history-list"></div>
+
+        <div id="stats-section" class="stats-section" hidden>
+          <div class="section-header">30-day stats</div>
+          <div id="dictation-stats" class="dictation-stats-row"></div>
+        </div>
+
+        <div class="history-section">
+          <div class="section-header">
+            Transcriptions
+            <span class="section-hint">click to copy</span>
+          </div>
+          <div class="history-scroll">
+            <div id="empty-history" class="empty-state">No transcriptions yet</div>
+            <div id="history-list" class="history-list"></div>
+          </div>
+        </div>
       </section>
 
       <footer id="permission-bar" class="permission-bar" hidden>

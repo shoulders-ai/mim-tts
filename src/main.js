@@ -297,20 +297,21 @@ async function downloadSelectedModel() {
 }
 
 async function refreshStats() {
-  const el_stats = document.getElementById("dictation-stats");
-  if (!el_stats) return;
+  const section = document.getElementById("stats-section");
+  const row = document.getElementById("dictation-stats");
+  if (!section || !row) return;
   try {
     const s = await invoke("get_dictation_stats");
     if (s.session_count === 0) {
-      el_stats.hidden = true;
+      section.hidden = true;
       return;
     }
     const mins = Math.round(s.total_duration_ms / 60000);
     const wpm = Math.round(s.avg_wpm);
-    el_stats.textContent = `30d: ${s.total_words} words · ${mins}m recorded · ${wpm} wpm`;
-    el_stats.hidden = false;
+    row.textContent = `${s.total_words} words · ${mins}m recorded · ${wpm} words/min`;
+    section.hidden = false;
   } catch (_) {
-    el_stats.hidden = true;
+    section.hidden = true;
   }
 }
 
