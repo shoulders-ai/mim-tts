@@ -85,7 +85,7 @@ jobs:
           args: ${{ matrix.build_args }}
 
       - name: Sign Windows artifacts
-        if: runner.os == 'Windows' && secrets.AZURE_CLIENT_ID != ''
+        if: runner.os == 'Windows'
         uses: azure/trusted-signing-action@v0.5.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
