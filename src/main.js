@@ -68,8 +68,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.settingsToggle.addEventListener("click", toggleSettings);
   el.recordToggle.addEventListener("click", toggleRecording);
   el.modelDownloadButton.addEventListener("click", downloadSelectedModel);
-  el.modelButton.addEventListener("click", (e) => { e.stopPropagation(); setModelMenuOpen(!state.modelOpen); });
-  el.languageButton.addEventListener("click", (e) => { e.stopPropagation(); setLanguageMenuOpen(!state.languageOpen); });
+  el.modelButton.addEventListener("click", (e) => { e.stopPropagation(); closeAllDropdowns(); setModelMenuOpen(!state.modelOpen); });
+  el.languageButton.addEventListener("click", (e) => { e.stopPropagation(); closeAllDropdowns(); setLanguageMenuOpen(!state.languageOpen); });
   el.hotkeyRecord.addEventListener("click", startHotkeyCapture);
   el.modeHold.addEventListener("click", () => setActivationMode("hold"));
   el.modeToggle.addEventListener("click", () => setActivationMode("toggle"));
@@ -545,6 +545,11 @@ async function handleKeydown(event) {
     else if (state.modelOpen) setModelMenuOpen(false);
     else invoke("hide_panel");
   }
+}
+
+function closeAllDropdowns() {
+  if (state.languageOpen) setLanguageMenuOpen(false);
+  if (state.modelOpen) setModelMenuOpen(false);
 }
 
 function closeDropdowns(event) {

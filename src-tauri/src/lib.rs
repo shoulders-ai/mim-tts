@@ -49,6 +49,16 @@ pub fn run() {
             register_first_available_shortcut(app.handle());
             fn_hotkey::start(app.handle());
             build_tray(app)?;
+
+            if let Some(window) = app.get_webview_window("main") {
+                let w = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(false) = event {
+                        let _ = w.hide();
+                    }
+                });
+            }
+
             if should_show_panel_on_start(app) {
                 toggle_panel(app.handle());
             }
