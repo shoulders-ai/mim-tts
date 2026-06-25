@@ -71,7 +71,7 @@ input:focus-visible {
   width: 320px;
   height: 420px;
   display: grid;
-  grid-template-rows: 44px 118px 1fr;
+  grid-template-rows: 44px 118px 1fr auto;
   background: linear-gradient(180deg, var(--color-chrome-high), var(--color-chrome) 161px, var(--color-surface) 162px);
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-xl);
