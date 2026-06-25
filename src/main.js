@@ -74,6 +74,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.modeHold.addEventListener("click", () => setActivationMode("hold"));
   el.modeToggle.addEventListener("click", () => setActivationMode("toggle"));
   el.audioCuesToggle.addEventListener("click", toggleAudioCues);
+  document.getElementById("clear-history")?.addEventListener("click", clearHistory);
   el.muteToggle.addEventListener("click", toggleMuteDuringRecording);
   document.getElementById("perm-mic")?.addEventListener("click", grantMicPermission);
   document.getElementById("perm-acc")?.addEventListener("click", grantAccessibilityPermission);
@@ -449,10 +450,22 @@ async function refreshStats() {
 
 // ── History ──────────────────────────────────────────────────
 
+async function clearHistory() {
+  try {
+    await invoke("clear_history");
+    await refreshHistory();
+    await refreshStats();
+    setStatus("idle", "History cleared");
+    setTimeout(() => setStatus("idle", idleStatusMessage()), 900);
+  } catch (error) { setStatus("idle", String(error)); }
+}
+
 async function refreshHistory() {
   const items = await invoke("get_history");
   el.historyList.textContent = "";
   el.emptyHistory.style.display = items.length ? "none" : "grid";
+  const clearBtn = document.getElementById("clear-history");
+  if (clearBtn) clearBtn.hidden = items.length === 0;
   for (const item of items) {
     const row = document.createElement("button");
     row.className = "history-item"; row.type = "button";

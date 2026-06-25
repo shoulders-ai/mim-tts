@@ -263,7 +263,15 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   font-size: 10px; font-weight: 650; color: var(--ink-3);
   text-transform: uppercase; letter-spacing: 0.04em;
 }
+.section-actions { display: flex; align-items: baseline; gap: 8px; }
 .section-hint { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--ink-4); }
+.clear-btn {
+  border: 0; padding: 0; background: transparent;
+  font: inherit; font-size: 10px; font-weight: 600; color: var(--ink-4);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.clear-btn:hover { color: var(--red); }
+.clear-btn[hidden] { display: none; }
 
 .stats-section { flex-shrink: 0; border-bottom: 1px solid var(--rule-lt); }
 .stats-section[hidden] { display: none; }
