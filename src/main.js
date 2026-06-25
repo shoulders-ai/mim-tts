@@ -64,6 +64,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.modeToggle.addEventListener("click", () => setActivationMode("toggle"));
   el.autoPasteToggle.addEventListener("click", toggleAutoPaste);
   el.audioCuesToggle.addEventListener("click", toggleAudioCues);
+  document.getElementById("perm-mic")?.addEventListener("click", grantMicPermission);
+  document.getElementById("perm-acc")?.addEventListener("click", grantAccessibilityPermission);
 
   window.addEventListener("keydown", handleKeydown);
   window.addEventListener("click", closeLanguageMenuFromClick);
@@ -111,33 +113,18 @@ async function checkPermissions() {
 }
 
 function updatePermissionUI(perms) {
-  const gate = document.getElementById("permission-gate");
-  if (!gate) return;
+  const bar = document.getElementById("permission-bar");
+  const micChip = document.getElementById("perm-mic");
+  const accChip = document.getElementById("perm-acc");
+  if (!bar) return;
 
-  const micNeeded = perms.microphone !== "authorized";
-  const accNeeded = !perms.accessibility;
+  const micOk = perms.microphone === "authorized";
+  const accOk = perms.accessibility;
 
-  if (!micNeeded && !accNeeded) {
-    gate.hidden = true;
-    return;
-  }
+  bar.hidden = micOk && accOk;
 
-  gate.hidden = false;
-
-  const micRow = document.getElementById("perm-mic");
-  const accRow = document.getElementById("perm-acc");
-  if (micRow) {
-    micRow.dataset.status = perms.microphone === "authorized" ? "granted" : perms.microphone;
-    micRow.querySelector(".perm-action").textContent =
-      perms.microphone === "not_determined" ? "Grant" :
-      perms.microphone === "denied" ? "Open Settings" : "Granted";
-    micRow.querySelector(".perm-action").disabled = perms.microphone === "authorized";
-  }
-  if (accRow) {
-    accRow.dataset.status = perms.accessibility ? "granted" : "needed";
-    accRow.querySelector(".perm-action").textContent = perms.accessibility ? "Granted" : "Open Settings";
-    accRow.querySelector(".perm-action").disabled = perms.accessibility;
-  }
+  if (micChip) micChip.dataset.status = micOk ? "granted" : perms.microphone;
+  if (accChip) accChip.dataset.status = accOk ? "granted" : "needed";
 }
 
 async function grantMicPermission() {
