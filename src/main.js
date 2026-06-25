@@ -119,7 +119,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (capturingHotkey) invoke("cancel_hotkey_capture");
   });
 
-  await listen("recording-state", (event) => setStatus(event.payload.state, event.payload.message));
+  await listen("recording-state", (event) => handleRecordingState(event.payload));
   await listen("history-changed", () => { refreshHistory(); refreshStats(); });
   await listen("settings-changed", (event) => applySettings(event.payload));
   await listen("hotkey-captured", (event) => {
@@ -132,6 +132,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
 
   await boot();
+  setInterval(refreshPermissionsForAttention, 4000);
 });
 
 // ── Boot & settings collapse ─────────────────────────────────
@@ -286,6 +287,11 @@ function updateSetupUI() {
     : `Hold ${formatHotkey(state.settings?.hotkey || defaultHotkey)} to dictate.`;
 }
 
+async function refreshPermissionsForAttention() {
+  if (state.recording || accessibilityRequestInFlight) return;
+  await checkPermissions();
+}
+
 function setupActionLabel(task) {
   if (task === "model") return "Download model";
   if (task === "microphone") return "Allow microphone";
@@ -407,6 +413,27 @@ async function grantAccessibilityPermission() {
   }
 }
 
+function handleRecordingState(payload) {
+  const stateName = payload?.state || "idle";
+  const message = payload?.message || "Ready";
+  state.recording = stateName === "recording";
+  setStatus(stateName, message);
+
+  if (messageNeedsPermissionRefresh(message)) {
+    setTimeout(checkPermissions, 0);
+  }
+}
+
+function messageNeedsPermissionRefresh(message) {
+  const text = String(message || "").toLowerCase();
+  return (
+    text.includes("accessibility") ||
+    text.includes("input monitoring") ||
+    text.includes("keyboard access") ||
+    text.includes("paste manually")
+  );
+}
+
 function pollAccessibilityPermission(attempts, delayMs) {
   if (accessibilityPollTimer) clearTimeout(accessibilityPollTimer);
 
@@ -483,6 +510,9 @@ async function stopRecording() {
     setStatus("transcribing", "Transcribing");
     const result = await invoke("stop_recording");
     state.recording = false;
+    if (result.paste && !result.paste.pasted) {
+      await checkPermissions();
+    }
     if (result.transcript?.text) {
       setStatus("done", result.message || "Done");
       setTimeout(() => setStatus("idle", idleStatusMessage()), 1200);
