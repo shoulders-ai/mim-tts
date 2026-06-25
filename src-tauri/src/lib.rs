@@ -73,6 +73,7 @@ pub fn run() {
             commands::download_model,
             commands::copy_text,
             commands::hide_panel,
+            commands::get_dictation_stats,
             commands::check_permissions,
             commands::request_mic_permission,
             commands::open_permission_settings,

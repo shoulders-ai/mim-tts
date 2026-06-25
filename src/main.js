@@ -76,7 +76,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
 
   await listen("recording-state", (event) => setStatus(event.payload.state, event.payload.message));
-  await listen("history-changed", refreshHistory);
+  await listen("history-changed", () => { refreshHistory(); refreshStats(); });
   await listen("settings-changed", (event) => applySettings(event.payload));
   await listen("hotkey-captured", (event) => {
     if (capturingHotkey) saveHotkey(event.payload.hotkey);
@@ -94,6 +94,7 @@ async function boot() {
   applySettings(await invoke("get_settings"));
   await refreshModels();
   await refreshHistory();
+  await refreshStats();
   await checkPermissions();
   const selected = selectedModelStatus();
   setStatus(
@@ -265,6 +266,24 @@ async function downloadSelectedModel() {
     delete state.downloadProgress[model];
     await refreshModels();
     setStatus("idle", String(error));
+  }
+}
+
+async function refreshStats() {
+  const el_stats = document.getElementById("dictation-stats");
+  if (!el_stats) return;
+  try {
+    const s = await invoke("get_dictation_stats");
+    if (s.session_count === 0) {
+      el_stats.hidden = true;
+      return;
+    }
+    const mins = Math.round(s.total_duration_ms / 60000);
+    const wpm = Math.round(s.avg_wpm);
+    el_stats.textContent = `30d: ${s.total_words} words · ${mins}m recorded · ${wpm} wpm`;
+    el_stats.hidden = false;
+  } catch (_) {
+    el_stats.hidden = true;
   }
 }
 

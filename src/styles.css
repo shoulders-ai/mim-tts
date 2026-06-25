@@ -478,6 +478,20 @@ select,
   color: var(--color-ink-3);
 }
 
+.dictation-stats {
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-ink-4);
+  text-align: center;
+  border-bottom: 1px solid var(--color-rule-light);
+  flex-shrink: 0;
+}
+
+.dictation-stats[hidden] {
+  display: none;
+}
+
 .empty-state {
   height: 100%;
   display: grid;

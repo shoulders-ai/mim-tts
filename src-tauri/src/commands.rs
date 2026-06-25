@@ -5,7 +5,7 @@ use tauri_plugin_global_shortcut::ShortcutState;
 
 use crate::{
     audio::RecordingStats,
-    db::Transcription,
+    db::{DictationStats, Transcription},
     models::{self, ModelStatus},
     paste::{self, PasteOutcome},
     settings::{is_supported_language, Settings},
@@ -404,6 +404,11 @@ fn emit_status(app: &AppHandle, state: &str, message: &str) {
 
 fn emit_settings(app: &AppHandle, settings: &Settings) {
     let _ = app.emit("settings-changed", settings);
+}
+
+#[tauri::command]
+pub fn get_dictation_stats(state: State<'_, AppState>) -> CommandResult<DictationStats> {
+    state.db.stats_30d().map_err(to_command_error)
 }
 
 #[tauri::command]
