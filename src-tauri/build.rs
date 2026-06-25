@@ -9,5 +9,6 @@ fn main() {
             .compile("permissions_bridge");
         println!("cargo:rustc-link-lib=framework=AVFoundation");
         println!("cargo:rustc-link-lib=framework=ApplicationServices");
+        println!("cargo:rustc-link-lib=framework=CoreAudio");
     }
 }

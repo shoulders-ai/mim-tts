@@ -10,6 +10,8 @@ pub struct Settings {
     pub activation_mode: String,
     pub audio_cues: bool,
     pub auto_paste: bool,
+    #[serde(default)]
+    pub mute_during_recording: bool,
 }
 
 impl Default for Settings {
@@ -21,6 +23,7 @@ impl Default for Settings {
             activation_mode: "hold".to_string(),
             audio_cues: true,
             auto_paste: true,
+            mute_during_recording: false,
         }
     }
 }

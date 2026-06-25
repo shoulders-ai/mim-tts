@@ -6,6 +6,7 @@ mod models;
 mod paste;
 mod permissions;
 mod settings;
+mod system_audio;
 mod state;
 mod transcribe;
 
@@ -69,6 +70,7 @@ pub fn run() {
             commands::set_activation_mode,
             commands::set_audio_cues,
             commands::set_auto_paste,
+            commands::set_mute_during_recording,
             commands::get_model_status,
             commands::download_model,
             commands::copy_text,

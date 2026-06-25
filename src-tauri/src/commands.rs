@@ -291,6 +291,13 @@ async fn start_recording_impl(app: AppHandle) -> CommandResult<()> {
         return Err(format!("Download the {model} model before recording."));
     }
 
+    let mute = state
+        .settings
+        .lock()
+        .map_err(|_| "settings lock poisoned".to_string())?
+        .mute_during_recording;
+    crate::system_audio::mute_if_needed(mute);
+
     {
         let mut recorder = state
             .recorder
@@ -305,6 +312,8 @@ async fn start_recording_impl(app: AppHandle) -> CommandResult<()> {
 
 async fn stop_recording_impl(app: AppHandle) -> CommandResult<StopResult> {
     let state = app.state::<AppState>();
+    crate::system_audio::restore();
+
     let capture = {
         let mut recorder = state
             .recorder
@@ -404,6 +413,24 @@ fn emit_status(app: &AppHandle, state: &str, message: &str) {
 
 fn emit_settings(app: &AppHandle, settings: &Settings) {
     let _ = app.emit("settings-changed", settings);
+}
+
+#[tauri::command]
+pub fn set_mute_during_recording(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> CommandResult<Settings> {
+    {
+        let mut settings = state
+            .settings
+            .lock()
+            .map_err(|_| "settings lock poisoned".to_string())?;
+        settings.mute_during_recording = enabled;
+    }
+    let settings = state.save_settings().map_err(to_command_error)?;
+    emit_settings(&app, &settings);
+    Ok(settings)
 }
 
 #[tauri::command]

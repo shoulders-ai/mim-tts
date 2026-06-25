@@ -44,6 +44,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.modeToggle = document.querySelector("#mode-toggle");
   el.autoPasteToggle = document.querySelector("#auto-paste-toggle");
   el.audioCuesToggle = document.querySelector("#audio-cues-toggle");
+  el.muteToggle = document.querySelector("#mute-toggle");
   el.historyList = document.querySelector("#history-list");
   el.emptyHistory = document.querySelector("#empty-history");
   el.modelGate = document.querySelector("#model-gate");
@@ -64,6 +65,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.modeToggle.addEventListener("click", () => setActivationMode("toggle"));
   el.autoPasteToggle.addEventListener("click", toggleAutoPaste);
   el.audioCuesToggle.addEventListener("click", toggleAudioCues);
+  el.muteToggle.addEventListener("click", toggleMuteDuringRecording);
   document.getElementById("perm-mic")?.addEventListener("click", grantMicPermission);
   document.getElementById("perm-acc")?.addEventListener("click", grantAccessibilityPermission);
 
@@ -227,6 +229,15 @@ async function toggleAudioCues() {
   try {
     const enabled = !(state.settings?.audio_cues ?? true);
     applySettings(await invoke("set_audio_cues", { enabled }));
+  } catch (error) {
+    setStatus("idle", String(error));
+  }
+}
+
+async function toggleMuteDuringRecording() {
+  try {
+    const enabled = !(state.settings?.mute_during_recording ?? false);
+    applySettings(await invoke("set_mute_during_recording", { enabled }));
   } catch (error) {
     setStatus("idle", String(error));
   }
@@ -503,6 +514,7 @@ function updateModeControls() {
 function updateToggleControls() {
   el.autoPasteToggle.setAttribute("aria-pressed", state.settings?.auto_paste ? "true" : "false");
   el.audioCuesToggle.setAttribute("aria-pressed", state.settings?.audio_cues ? "true" : "false");
+  el.muteToggle.setAttribute("aria-pressed", state.settings?.mute_during_recording ? "true" : "false");
 }
 
 function eventToHotkey(event) {
