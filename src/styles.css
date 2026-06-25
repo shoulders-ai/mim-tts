@@ -138,6 +138,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 
 .setting-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
   border: 0; border-radius: var(--r-sm); background: transparent; text-align: left;
 }
 .setting-btn:hover { background: var(--accent-soft); }
@@ -153,18 +154,25 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 .setting-picker { position: relative; }
 
 .setting-value {
-  border: 0; padding: 0; background: transparent;
+  height: 22px; padding: 0 7px;
+  border: 1px solid var(--rule); border-radius: var(--r-md);
+  background: linear-gradient(180deg, #fff, var(--surface-lo));
   font: inherit; font-size: 11px; color: var(--ink-2);
   text-align: right;
 }
-.setting-value:hover { color: var(--ink); }
+.setting-value:hover { border-color: var(--ink-4); }
 
 .setting-hotkey {
   display: flex; align-items: center; gap: 6px;
-  border: 0; padding: 0; background: transparent;
+  height: 22px; padding: 0 7px;
+  border: 1px solid var(--rule); border-radius: var(--r-md);
+  background: linear-gradient(180deg, #fff, var(--surface-lo));
   font: inherit;
 }
-.setting-hotkey:hover .hotkey-keys { color: var(--ink); }
+.setting-hotkey:hover { border-color: var(--ink-4); }
+.setting-hotkey[data-capturing="true"] {
+  border-color: var(--accent); background: var(--chrome-mid);
+}
 .setting-hotkey[data-capturing="true"] .hotkey-keys { color: var(--accent); }
 .setting-hotkey[data-capturing="true"] .hotkey-tag { color: var(--accent); }
 

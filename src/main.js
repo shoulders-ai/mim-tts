@@ -52,7 +52,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.hotkeyAction = document.querySelector("#hotkey-action");
   el.modeHold = document.querySelector("#mode-hold");
   el.modeToggle = document.querySelector("#mode-toggle");
-  el.autoPasteToggle = document.querySelector("#auto-paste-toggle");
   el.audioCuesToggle = document.querySelector("#audio-cues-toggle");
   el.muteToggle = document.querySelector("#mute-toggle");
   el.historyList = document.querySelector("#history-list");
@@ -74,7 +73,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.hotkeyRecord.addEventListener("click", startHotkeyCapture);
   el.modeHold.addEventListener("click", () => setActivationMode("hold"));
   el.modeToggle.addEventListener("click", () => setActivationMode("toggle"));
-  el.autoPasteToggle.addEventListener("click", toggleAutoPaste);
   el.audioCuesToggle.addEventListener("click", toggleAudioCues);
   el.muteToggle.addEventListener("click", toggleMuteDuringRecording);
   document.getElementById("perm-mic")?.addEventListener("click", grantMicPermission);
@@ -397,11 +395,6 @@ async function setActivationMode(mode) {
   catch (error) { setStatus("idle", String(error)); }
 }
 
-async function toggleAutoPaste() {
-  try { applySettings(await invoke("set_auto_paste", { enabled: !(state.settings?.auto_paste ?? true) })); }
-  catch (error) { setStatus("idle", String(error)); }
-}
-
 async function toggleAudioCues() {
   try { applySettings(await invoke("set_audio_cues", { enabled: !(state.settings?.audio_cues ?? true) })); }
   catch (error) { setStatus("idle", String(error)); }
@@ -419,7 +412,6 @@ function updateModeControls() {
 }
 
 function updateToggleControls() {
-  el.autoPasteToggle.setAttribute("aria-pressed", state.settings?.auto_paste ? "true" : "false");
   el.audioCuesToggle.setAttribute("aria-pressed", state.settings?.audio_cues ? "true" : "false");
   el.muteToggle.setAttribute("aria-pressed", state.settings?.mute_during_recording ? "true" : "false");
 }
