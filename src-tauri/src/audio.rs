@@ -30,6 +30,7 @@ struct ActiveRecording {
 #[derive(Debug, Clone, Serialize)]
 pub struct RecordingStats {
     pub duration_ms: u64,
+    pub speech_duration_ms: u64,
     pub sample_count: usize,
     pub rms: f32,
     pub peak: f32,
@@ -242,10 +243,13 @@ fn resample_linear(samples: &[f32], source_rate: u32, target_rate: u32) -> Vec<f
     output
 }
 
+const WINDOW_SAMPLES: usize = TARGET_SAMPLE_RATE as usize / 10; // 100ms windows
+
 fn analyze(samples: &[f32], elapsed_ms: u64) -> RecordingStats {
     if samples.is_empty() {
         return RecordingStats {
             duration_ms: elapsed_ms,
+            speech_duration_ms: 0,
             sample_count: 0,
             rms: 0.0,
             peak: 0.0,
@@ -255,20 +259,40 @@ fn analyze(samples: &[f32], elapsed_ms: u64) -> RecordingStats {
 
     let mut peak = 0.0_f32;
     let mut energy = 0.0_f64;
-    for sample in samples {
-        let abs = sample.abs();
-        peak = peak.max(abs);
-        energy += f64::from(sample * sample);
+    let mut speech_windows = 0_usize;
+    let mut total_windows = 0_usize;
+
+    for chunk in samples.chunks(WINDOW_SAMPLES) {
+        total_windows += 1;
+        let mut chunk_energy = 0.0_f64;
+        let mut chunk_peak = 0.0_f32;
+        for &s in chunk {
+            let abs = s.abs();
+            chunk_peak = chunk_peak.max(abs);
+            chunk_energy += f64::from(s * s);
+            peak = peak.max(abs);
+            energy += f64::from(s * s);
+        }
+        let chunk_rms = (chunk_energy / chunk.len() as f64).sqrt() as f32;
+        if chunk_rms > RMS_THRESHOLD || chunk_peak > PEAK_THRESHOLD {
+            speech_windows += 1;
+        }
     }
 
     let rms = (energy / samples.len() as f64).sqrt() as f32;
     let sample_duration_ms =
         ((samples.len() as f64 / TARGET_SAMPLE_RATE as f64) * 1000.0).round() as u64;
     let duration_ms = sample_duration_ms.max(elapsed_ms);
+    let speech_duration_ms = if total_windows > 0 {
+        (speech_windows as u64 * duration_ms) / total_windows as u64
+    } else {
+        0
+    };
     let has_speech = duration_ms >= MIN_SPEECH_MS && (rms > RMS_THRESHOLD || peak > PEAK_THRESHOLD);
 
     RecordingStats {
         duration_ms,
+        speech_duration_ms,
         sample_count: samples.len(),
         rms,
         peak,

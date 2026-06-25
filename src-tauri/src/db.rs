@@ -14,6 +14,7 @@ pub struct Transcription {
     pub text: String,
     pub language: String,
     pub duration_ms: i64,
+    pub speech_duration_ms: i64,
     pub word_count: i64,
     pub model: String,
     pub created_at: String,
@@ -39,17 +40,19 @@ impl Database {
         text: &str,
         language: &str,
         duration_ms: i64,
+        speech_duration_ms: i64,
         model: &str,
     ) -> anyhow::Result<()> {
         let word_count = text.split_whitespace().count() as i64;
         let conn = self.open()?;
         conn.execute(
-            "INSERT INTO transcriptions (text, language, duration_ms, word_count, model, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO transcriptions (text, language, duration_ms, speech_duration_ms, word_count, model, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 text,
                 language,
                 duration_ms,
+                speech_duration_ms,
                 word_count,
                 model,
                 chrono::Utc::now().to_rfc3339()
@@ -68,7 +71,8 @@ impl Database {
     pub fn list(&self, limit: i64) -> anyhow::Result<Vec<Transcription>> {
         let conn = self.open()?;
         let mut stmt = conn.prepare(
-            "SELECT id, text, language, duration_ms, COALESCE(word_count, 0), model, created_at
+            "SELECT id, text, language, duration_ms, COALESCE(speech_duration_ms, 0),
+                    COALESCE(word_count, 0), model, created_at
              FROM transcriptions
              ORDER BY id DESC
              LIMIT ?1",
@@ -79,9 +83,10 @@ impl Database {
                 text: row.get(1)?,
                 language: row.get(2)?,
                 duration_ms: row.get(3)?,
-                word_count: row.get(4)?,
-                model: row.get(5)?,
-                created_at: row.get(6)?,
+                speech_duration_ms: row.get(4)?,
+                word_count: row.get(5)?,
+                model: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })?;
 
@@ -98,15 +103,16 @@ impl Database {
         let mut stmt = conn.prepare(
             "SELECT COALESCE(SUM(COALESCE(word_count, 0)), 0),
                     COALESCE(SUM(duration_ms), 0),
+                    COALESCE(SUM(COALESCE(speech_duration_ms, 0)), 0),
                     COUNT(*)
              FROM transcriptions
              WHERE created_at >= ?1",
         )?;
-        let (total_words, total_duration_ms, session_count): (i64, i64, i64) =
-            stmt.query_row(params![cutoff], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
+        let (total_words, total_duration_ms, total_speech_ms, session_count): (i64, i64, i64, i64) =
+            stmt.query_row(params![cutoff], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))?;
 
-        let avg_wpm = if total_duration_ms > 0 {
-            (total_words as f64 / total_duration_ms as f64) * 60_000.0
+        let avg_wpm = if total_speech_ms > 0 {
+            (total_words as f64 / total_speech_ms as f64) * 60_000.0
         } else {
             0.0
         };
@@ -138,6 +144,7 @@ impl Database {
                 text TEXT NOT NULL,
                 language TEXT NOT NULL,
                 duration_ms INTEGER NOT NULL,
+                speech_duration_ms INTEGER NOT NULL DEFAULT 0,
                 word_count INTEGER NOT NULL DEFAULT 0,
                 model TEXT NOT NULL,
                 created_at TEXT NOT NULL
@@ -145,13 +152,15 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_transcriptions_created
                 ON transcriptions(created_at DESC);",
         )?;
-        // migrate: add word_count to existing tables that lack it
-        let has_col: bool = conn
-            .prepare("SELECT word_count FROM transcriptions LIMIT 0")
-            .is_ok();
-        if !has_col {
+        // migrate: add columns to existing tables that lack them
+        if conn.prepare("SELECT word_count FROM transcriptions LIMIT 0").is_err() {
             conn.execute_batch(
                 "ALTER TABLE transcriptions ADD COLUMN word_count INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
+        if conn.prepare("SELECT speech_duration_ms FROM transcriptions LIMIT 0").is_err() {
+            conn.execute_batch(
+                "ALTER TABLE transcriptions ADD COLUMN speech_duration_ms INTEGER NOT NULL DEFAULT 0;",
             )?;
         }
         Ok(())

@@ -86,6 +86,7 @@ mod tests {
             activation_mode: "press".to_string(),
             audio_cues: true,
             auto_paste: true,
+            mute_during_recording: false,
         };
 
         settings.normalize();

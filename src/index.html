@@ -24,14 +24,15 @@
 
       <section class="control-stack" aria-label="Dictation controls">
         <div class="control-grid">
-          <label class="field">
+          <div class="field model-picker">
             <span>Model</span>
-            <select id="model-select">
-              <option value="tiny">tiny</option>
-              <option value="base">base</option>
-              <option value="small">small</option>
-            </select>
-          </label>
+            <button id="model-button" class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span id="model-value">tiny</span>
+            </button>
+            <div id="model-menu" class="model-menu" hidden>
+              <div id="model-list" class="model-list" role="listbox" aria-label="Models"></div>
+            </div>
+          </div>
           <div class="field language-picker">
             <span>Lang</span>
             <button id="language-button" class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false">

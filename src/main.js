@@ -21,6 +21,7 @@ const state = {
   models: [],
   downloadProgress: {},
   languageOpen: false,
+  modelOpen: false,
 };
 
 const el = {};
@@ -32,7 +33,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.statusLabel = document.querySelector("#status-label");
   el.statusDetail = document.querySelector("#status-detail");
   el.recordToggle = document.querySelector("#record-toggle");
-  el.modelSelect = document.querySelector("#model-select");
+  el.modelButton = document.querySelector("#model-button");
+  el.modelValue = document.querySelector("#model-value");
+  el.modelMenu = document.querySelector("#model-menu");
+  el.modelList = document.querySelector("#model-list");
   el.languageButton = document.querySelector("#language-button");
   el.languageValue = document.querySelector("#language-value");
   el.languageMenu = document.querySelector("#language-menu");
@@ -58,7 +62,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   el.recordToggle.addEventListener("click", toggleRecording);
   el.modelDownloadButton.addEventListener("click", downloadSelectedModel);
-  el.modelSelect.addEventListener("change", selectModel);
+  el.modelButton.addEventListener("click", toggleModelMenu);
   el.languageButton.addEventListener("click", toggleLanguageMenu);
   el.hotkeyRecord.addEventListener("click", startHotkeyCapture);
   el.modeHold.addEventListener("click", () => setActivationMode("hold"));
@@ -197,9 +201,21 @@ async function stopRecording() {
   }
 }
 
-async function selectModel() {
+function toggleModelMenu(event) {
+  event.stopPropagation();
+  setModelMenuOpen(!state.modelOpen);
+}
+
+function setModelMenuOpen(open) {
+  state.modelOpen = open;
+  el.modelMenu.hidden = !open;
+  el.modelButton.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+async function selectModel(model) {
+  setModelMenuOpen(false);
   try {
-    applySettings(await invoke("set_model", { model: el.modelSelect.value }));
+    applySettings(await invoke("set_model", { model }));
     await refreshModels();
     const selected = selectedModelStatus();
     setStatus("idle", selected?.installed ? "Ready" : "Download model");
@@ -245,7 +261,7 @@ async function toggleMuteDuringRecording() {
 
 function applySettings(settings) {
   state.settings = settings;
-  el.modelSelect.value = settings.model;
+  updateModelButton();
   updateLanguageButton();
   updateLanguageOptions();
   updateHotkeyControls();
@@ -386,9 +402,11 @@ function toggleLanguageMenu(event) {
 }
 
 function closeLanguageMenuFromClick(event) {
-  if (!state.languageOpen) return;
-  if (!event.target.closest(".language-picker")) {
+  if (state.languageOpen && !event.target.closest(".language-picker")) {
     setLanguageMenuOpen(false);
+  }
+  if (state.modelOpen && !event.target.closest(".model-picker")) {
+    setModelMenuOpen(false);
   }
 }
 
@@ -599,15 +617,27 @@ function selectedModelStatus() {
 function renderModelOptions() {
   if (!state.settings || !state.models.length) return;
 
-  const current = state.settings.model;
-  el.modelSelect.textContent = "";
+  el.modelList.textContent = "";
   for (const model of state.models) {
-    const option = document.createElement("option");
-    option.value = model.id;
+    const option = document.createElement("button");
+    option.className = "model-option";
+    option.type = "button";
+    option.role = "option";
+    option.dataset.model = model.id;
     option.textContent = `${model.id} · ${model.installed ? "ready" : "download"}`;
-    el.modelSelect.append(option);
+    option.addEventListener("click", () => selectModel(model.id));
+    el.modelList.append(option);
   }
-  el.modelSelect.value = current;
+  updateModelButton();
+}
+
+function updateModelButton() {
+  if (!state.settings) return;
+  const model = state.models.find((m) => m.id === state.settings.model);
+  el.modelValue.textContent = model ? `${model.id} · ${model.installed ? "ready" : "download"}` : state.settings.model;
+  for (const opt of el.modelList.querySelectorAll(".model-option")) {
+    opt.setAttribute("aria-selected", opt.dataset.model === state.settings.model ? "true" : "false");
+  }
 }
 
 function displayModelName(model) {

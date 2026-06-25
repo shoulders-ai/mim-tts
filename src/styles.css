@@ -223,7 +223,7 @@ input:focus-visible {
 }
 
 .toggle-row {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
 .field {
@@ -239,11 +239,11 @@ input:focus-visible {
   font-size: 11px;
 }
 
-.language-picker {
+.language-picker,
+.model-picker {
   position: relative;
 }
 
-select,
 .select-button {
   min-width: 0;
   width: 100%;
@@ -262,14 +262,16 @@ select,
   overflow: hidden;
 }
 
-#language-value {
+#language-value,
+#model-value {
   overflow: hidden;
   color: var(--color-ink-2);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.language-menu {
+.language-menu,
+.model-menu {
   position: absolute;
   z-index: 20;
   top: 34px;
@@ -282,7 +284,13 @@ select,
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
 }
 
-.language-menu[hidden] {
+.model-menu {
+  left: 0;
+  right: auto;
+}
+
+.language-menu[hidden],
+.model-menu[hidden] {
   display: none;
 }
 
@@ -290,6 +298,32 @@ select,
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
+}
+
+.model-list {
+  display: grid;
+  gap: 2px;
+}
+
+.model-option {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-2);
+  font-size: 11px;
+  text-align: left;
+}
+
+.model-option:hover {
+  background: var(--color-accent-soft);
+}
+
+.model-option[aria-selected="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
 }
 
 .language-option {

@@ -385,6 +385,7 @@ async fn stop_recording_impl(app: AppHandle) -> CommandResult<StopResult> {
             &transcript.text,
             &transcript.language,
             capture.stats.duration_ms as i64,
+            capture.stats.speech_duration_ms as i64,
             &transcript.model,
         )
         .map_err(to_command_error)?;
