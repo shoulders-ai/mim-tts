@@ -68,6 +68,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("keydown", handleKeydown);
   window.addEventListener("click", closeLanguageMenuFromClick);
   window.addEventListener("blur", stopHotkeyCapture);
+  window.addEventListener("focus", checkPermissions);
   window.addEventListener("beforeunload", () => {
     if (capturingHotkey) invoke("cancel_hotkey_capture");
   });
@@ -91,11 +92,67 @@ async function boot() {
   applySettings(await invoke("get_settings"));
   await refreshModels();
   await refreshHistory();
+  await checkPermissions();
   const selected = selectedModelStatus();
   setStatus(
     state.recording ? "recording" : "idle",
     state.recording ? "Recording" : selected?.installed ? "Ready" : "Download model",
   );
+}
+
+async function checkPermissions() {
+  try {
+    const perms = await invoke("check_permissions");
+    state.permissions = perms;
+    updatePermissionUI(perms);
+  } catch (_) {
+    state.permissions = { microphone: "authorized", accessibility: true };
+  }
+}
+
+function updatePermissionUI(perms) {
+  const gate = document.getElementById("permission-gate");
+  if (!gate) return;
+
+  const micNeeded = perms.microphone !== "authorized";
+  const accNeeded = !perms.accessibility;
+
+  if (!micNeeded && !accNeeded) {
+    gate.hidden = true;
+    return;
+  }
+
+  gate.hidden = false;
+
+  const micRow = document.getElementById("perm-mic");
+  const accRow = document.getElementById("perm-acc");
+  if (micRow) {
+    micRow.dataset.status = perms.microphone === "authorized" ? "granted" : perms.microphone;
+    micRow.querySelector(".perm-action").textContent =
+      perms.microphone === "not_determined" ? "Grant" :
+      perms.microphone === "denied" ? "Open Settings" : "Granted";
+    micRow.querySelector(".perm-action").disabled = perms.microphone === "authorized";
+  }
+  if (accRow) {
+    accRow.dataset.status = perms.accessibility ? "granted" : "needed";
+    accRow.querySelector(".perm-action").textContent = perms.accessibility ? "Granted" : "Open Settings";
+    accRow.querySelector(".perm-action").disabled = perms.accessibility;
+  }
+}
+
+async function grantMicPermission() {
+  const perms = state.permissions;
+  if (perms?.microphone === "not_determined") {
+    await invoke("request_mic_permission");
+    setTimeout(checkPermissions, 1000);
+  } else if (perms?.microphone === "denied" || perms?.microphone === "restricted") {
+    await invoke("open_permission_settings", { pane: "microphone" });
+  }
+}
+
+async function grantAccessibilityPermission() {
+  await invoke("open_permission_settings", { pane: "accessibility" });
+  setTimeout(checkPermissions, 2000);
 }
 
 async function toggleRecording() {
@@ -112,6 +169,15 @@ async function startRecording() {
     if (!selected?.installed) {
       setStatus("idle", "Download model");
       updateModelGate();
+      return;
+    }
+    if (state.permissions?.microphone === "denied") {
+      setStatus("idle", "Microphone access denied — open Settings to grant");
+      return;
+    }
+    if (state.permissions?.microphone === "not_determined") {
+      await invoke("request_mic_permission");
+      setTimeout(checkPermissions, 1000);
       return;
     }
     await invoke("start_recording");

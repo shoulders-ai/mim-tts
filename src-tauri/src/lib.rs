@@ -4,6 +4,7 @@ mod db;
 mod fn_hotkey;
 mod models;
 mod paste;
+mod permissions;
 mod settings;
 mod state;
 mod transcribe;
@@ -72,6 +73,9 @@ pub fn run() {
             commands::download_model,
             commands::copy_text,
             commands::hide_panel,
+            commands::check_permissions,
+            commands::request_mic_permission,
+            commands::open_permission_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

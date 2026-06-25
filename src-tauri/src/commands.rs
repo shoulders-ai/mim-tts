@@ -406,6 +406,23 @@ fn emit_settings(app: &AppHandle, settings: &Settings) {
     let _ = app.emit("settings-changed", settings);
 }
 
+#[tauri::command]
+pub fn check_permissions() -> CommandResult<crate::permissions::PermissionStatus> {
+    Ok(crate::permissions::check())
+}
+
+#[tauri::command]
+pub fn request_mic_permission() -> CommandResult<()> {
+    crate::permissions::request_mic();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_permission_settings(pane: String) -> CommandResult<()> {
+    crate::permissions::open_settings(&pane);
+    Ok(())
+}
+
 fn to_command_error(error: impl std::fmt::Display) -> String {
     error.to_string()
 }

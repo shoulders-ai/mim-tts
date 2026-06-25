@@ -63,6 +63,30 @@
         </div>
       </section>
 
+      <section id="permission-gate" class="permission-gate" hidden>
+        <div class="permission-title">Permissions needed</div>
+        <div id="perm-mic" class="permission-row" data-status="not_determined">
+          <div class="perm-info">
+            <span class="perm-icon">mic</span>
+            <div>
+              <div class="perm-label">Microphone</div>
+              <div class="perm-hint">Record audio for transcription</div>
+            </div>
+          </div>
+          <button class="perm-action" type="button" onclick="grantMicPermission()">Grant</button>
+        </div>
+        <div id="perm-acc" class="permission-row" data-status="needed">
+          <div class="perm-info">
+            <span class="perm-icon">key</span>
+            <div>
+              <div class="perm-label">Accessibility</div>
+              <div class="perm-hint">Global hotkey &amp; auto-paste</div>
+            </div>
+          </div>
+          <button class="perm-action" type="button" onclick="grantAccessibilityPermission()">Open Settings</button>
+        </div>
+      </section>
+
       <section class="history-wrap" aria-label="Transcription history">
         <div id="model-gate" class="model-gate" hidden>
           <div>
