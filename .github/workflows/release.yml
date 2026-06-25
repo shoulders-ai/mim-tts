@@ -96,6 +96,7 @@ jobs:
           certificate-profile-name: mim-1
           files-folder: src-tauri/target/release/bundle
           files-folder-filter: exe,msi
+          files-folder-recurse: true
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
