@@ -312,6 +312,7 @@ async fn start_recording_impl(app: AppHandle) -> CommandResult<()> {
 
 async fn stop_recording_impl(app: AppHandle) -> CommandResult<StopResult> {
     let state = app.state::<AppState>();
+    let mut tray_recording = RecordingTrayGuard::new(app.clone());
     crate::system_audio::restore();
 
     let capture = {
@@ -324,9 +325,9 @@ async fn stop_recording_impl(app: AppHandle) -> CommandResult<StopResult> {
         }
         recorder.stop_recording().map_err(to_command_error)?
     };
+    tray_recording.clear();
 
     if !capture.stats.has_speech {
-        crate::set_tray_busy(&app, false);
         emit_status(&app, "idle", "No speech detected");
         return Ok(StopResult {
             transcript: None,
@@ -359,7 +360,6 @@ async fn stop_recording_impl(app: AppHandle) -> CommandResult<StopResult> {
     .map_err(to_command_error)?;
 
     if transcript.text.trim().is_empty() {
-        crate::set_tray_busy(&app, false);
         emit_status(&app, "idle", "No text detected");
         return Ok(StopResult {
             transcript: Some(transcript),
@@ -390,7 +390,6 @@ async fn stop_recording_impl(app: AppHandle) -> CommandResult<StopResult> {
         )
         .map_err(to_command_error)?;
 
-    crate::set_tray_busy(&app, false);
     emit_status(&app, "done", &message);
     let _ = app.emit("history-changed", ());
 
@@ -400,6 +399,30 @@ async fn stop_recording_impl(app: AppHandle) -> CommandResult<StopResult> {
         stats: capture.stats,
         message,
     })
+}
+
+struct RecordingTrayGuard {
+    app: AppHandle,
+    active: bool,
+}
+
+impl RecordingTrayGuard {
+    fn new(app: AppHandle) -> Self {
+        Self { app, active: true }
+    }
+
+    fn clear(&mut self) {
+        if self.active {
+            crate::set_tray_busy(&self.app, false);
+            self.active = false;
+        }
+    }
+}
+
+impl Drop for RecordingTrayGuard {
+    fn drop(&mut self) {
+        self.clear();
+    }
 }
 
 fn emit_status(app: &AppHandle, state: &str, message: &str) {
@@ -448,6 +471,16 @@ pub fn check_permissions() -> CommandResult<crate::permissions::PermissionStatus
 pub fn request_mic_permission() -> CommandResult<()> {
     crate::permissions::request_mic();
     Ok(())
+}
+
+#[tauri::command]
+pub fn request_accessibility_permission() -> CommandResult<crate::permissions::PermissionStatus> {
+    Ok(crate::permissions::request_accessibility())
+}
+
+#[tauri::command]
+pub fn request_keyboard_permission() -> CommandResult<crate::permissions::PermissionStatus> {
+    Ok(crate::permissions::request_keyboard())
 }
 
 #[tauri::command]

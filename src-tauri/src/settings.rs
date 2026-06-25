@@ -17,9 +17,9 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            model: "tiny".to_string(),
+            model: "base".to_string(),
             languages: vec!["de".to_string(), "en".to_string()],
-            hotkey: "CommandOrControl+Shift+Space".to_string(),
+            hotkey: default_hotkey().to_string(),
             activation_mode: "hold".to_string(),
             audio_cues: true,
             auto_paste: true,
@@ -52,7 +52,7 @@ impl Settings {
 
     pub fn normalize(&mut self) {
         if !matches!(self.model.as_str(), "tiny" | "base" | "small") {
-            self.model = "tiny".to_string();
+            self.model = "base".to_string();
         }
         self.languages.retain(|lang| is_supported_language(lang));
         self.languages.sort();
@@ -61,9 +61,23 @@ impl Settings {
             self.activation_mode = "hold".to_string();
         }
         if self.hotkey.trim().is_empty() {
-            self.hotkey = "CommandOrControl+Shift+Space".to_string();
+            self.hotkey = default_hotkey().to_string();
         }
     }
+}
+
+pub fn default_hotkey() -> &'static str {
+    default_hotkey_for_platform()
+}
+
+#[cfg(target_os = "macos")]
+fn default_hotkey_for_platform() -> &'static str {
+    "Option"
+}
+
+#[cfg(not(target_os = "macos"))]
+fn default_hotkey_for_platform() -> &'static str {
+    "F8"
 }
 
 pub fn is_supported_language(lang: &str) -> bool {
@@ -91,9 +105,9 @@ mod tests {
 
         settings.normalize();
 
-        assert_eq!(settings.model, "tiny");
+        assert_eq!(settings.model, "base");
         assert_eq!(settings.activation_mode, "hold");
-        assert_eq!(settings.hotkey, "CommandOrControl+Shift+Space");
+        assert_eq!(settings.hotkey, default_hotkey());
     }
 
     #[test]

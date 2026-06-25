@@ -1,7 +1,7 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
-const defaultHotkey = "CommandOrControl+Shift+Space";
+const defaultHotkey = "Option";
 const languageOptions = [
   ["auto", "Auto"],
   ["de", "DE"],
@@ -24,17 +24,44 @@ const state = {
   languageOpen: false,
   modelOpen: false,
   settingsOpen: false,
+  setupActive: false,
+  setupBusyTask: null,
 };
 
 const el = {};
 let capturingHotkey = false;
 let captureTimer = null;
+let accessibilityRequestInFlight = false;
+let accessibilityPollTimer = null;
 
 window.addEventListener("DOMContentLoaded", async () => {
   el.panel = document.querySelector(".panel");
   el.statusLabel = document.querySelector("#status-label");
   el.statusDetail = document.querySelector("#status-detail");
   el.recordToggle = document.querySelector("#record-toggle");
+  el.setupSection = document.querySelector("#setup-section");
+  el.setupDetail = document.querySelector("#setup-detail");
+  el.setupContinue = document.querySelector("#setup-continue");
+  el.setupDownloadTrack = document.querySelector("#setup-download-track");
+  el.setupDownloadFill = document.querySelector("#setup-download-fill");
+  el.setupTasks = {
+    model: {
+      row: document.querySelector("#setup-model"),
+      detail: document.querySelector("#setup-model-detail"),
+      badge: document.querySelector("#setup-model-badge"),
+    },
+    microphone: {
+      row: document.querySelector("#setup-mic"),
+      detail: document.querySelector("#setup-mic-detail"),
+      badge: document.querySelector("#setup-mic-badge"),
+    },
+    keyboard: {
+      row: document.querySelector("#setup-keyboard"),
+      detail: document.querySelector("#setup-keyboard-detail"),
+      badge: document.querySelector("#setup-keyboard-badge"),
+    },
+  };
+  el.settingsSection = document.querySelector("#settings-section");
   el.settingsToggle = document.querySelector("#settings-toggle");
   el.settingsBody = document.querySelector("#settings-body");
   el.settingsDot = document.querySelector("#settings-dot");
@@ -62,11 +89,16 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.modelDownloadButton = document.querySelector("#model-download-button");
   el.modelDownloadFill = document.querySelector("#model-download-fill");
   el.modelDownloadProgress = document.querySelector("#model-download-progress");
+  el.contentSection = document.querySelector("#content-section");
 
   renderLanguageOptions();
 
   el.settingsToggle.addEventListener("click", toggleSettings);
   el.recordToggle.addEventListener("click", toggleRecording);
+  el.setupContinue.addEventListener("click", runNextSetupTask);
+  el.setupTasks.model.row.addEventListener("click", () => runSetupTask("model"));
+  el.setupTasks.microphone.row.addEventListener("click", () => runSetupTask("microphone"));
+  el.setupTasks.keyboard.row.addEventListener("click", () => runSetupTask("keyboard"));
   el.modelDownloadButton.addEventListener("click", downloadSelectedModel);
   el.modelButton.addEventListener("click", (e) => { e.stopPropagation(); const open = !state.modelOpen; closeAllDropdowns(); if (open) setModelMenuOpen(true); });
   el.languageButton.addEventListener("click", (e) => { e.stopPropagation(); const open = !state.languageOpen; closeAllDropdowns(); if (open) setLanguageMenuOpen(true); });
@@ -96,6 +128,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await listen("model-download-progress", (event) => {
     state.downloadProgress[event.payload.model] = event.payload;
     updateModelGate();
+    updateSetupUI();
   });
 
   await boot();
@@ -111,13 +144,11 @@ async function boot() {
   await refreshStats();
   await checkPermissions();
 
-  const selected = selectedModelStatus();
-  const needsSetup = !selected?.installed || needsPermissionAttention();
-  if (needsSetup) setSettingsOpen(true);
+  updateSetupUI();
 
   setStatus(
     state.recording ? "recording" : "idle",
-    state.recording ? "Recording" : selected?.installed ? "Ready" : "Download model",
+    state.recording ? "Recording" : isSetupComplete() ? "Ready" : "Set up Mim",
   );
 }
 
@@ -142,7 +173,151 @@ function updateSettingsDot() {
 
 function needsPermissionAttention() {
   if (!state.permissions) return false;
-  return state.permissions.microphone !== "authorized" || !state.permissions.accessibility;
+  return state.permissions.microphone !== "authorized" || !keyboardAccessGranted();
+}
+
+// ── Setup checklist ──────────────────────────────────────────
+
+function isSetupComplete() {
+  const selected = selectedModelStatus();
+  return Boolean(
+    selected?.installed &&
+    state.permissions?.microphone === "authorized" &&
+    keyboardAccessGranted()
+  );
+}
+
+function keyboardAccessGranted() {
+  return Boolean(state.permissions?.accessibility && state.permissions?.input_monitoring);
+}
+
+function setupTasks() {
+  const selected = selectedModelStatus();
+  const progress = state.downloadProgress[state.settings?.model];
+  const modelDone = Boolean(selected?.installed);
+  const micStatus = state.permissions?.microphone || "not_determined";
+  const micDone = micStatus === "authorized";
+  const keyboardDone = keyboardAccessGranted();
+  const hotkey = formatHotkey(state.settings?.hotkey || defaultHotkey);
+
+  return [
+    {
+      id: "model",
+      done: modelDone,
+      busy: Boolean(progress),
+      detail: progress
+        ? `${Math.round(progress.percent || 0)}% · ${formatBytes(progress.bytes || 0)}`
+        : selected ? `${selected.name}, ${formatBytes(selected.min_bytes)}` : "Base, recommended",
+      badge: modelDone ? "Done" : progress ? `${Math.round(progress.percent || 0)}%` : "Download",
+    },
+    {
+      id: "microphone",
+      done: micDone,
+      busy: state.setupBusyTask === "microphone",
+      detail: micDone ? "Ready to record" : micStatus === "denied" || micStatus === "restricted" ? "Open Privacy & Security" : "Approve the system prompt",
+      badge: micDone ? "Done" : micStatus === "denied" || micStatus === "restricted" ? "Open" : "Allow",
+    },
+    {
+      id: "keyboard",
+      done: keyboardDone,
+      busy: accessibilityRequestInFlight || state.setupBusyTask === "keyboard",
+      detail: keyboardDone ? `${hotkey} is ready` : keyboardSetupDetail(hotkey),
+      badge: keyboardDone ? "Done" : accessibilityRequestInFlight ? "Waiting" : "Enable",
+    },
+  ];
+}
+
+function keyboardSetupDetail(hotkey) {
+  if (!state.permissions?.accessibility) return `Required for paste and ${hotkey}`;
+  if (!state.permissions?.input_monitoring) return `Required to hear ${hotkey}`;
+  return `Required for ${hotkey} and paste`;
+}
+
+function firstIncompleteSetupTask() {
+  return setupTasks().find((task) => !task.done) || null;
+}
+
+function updateSetupUI() {
+  if (!el.setupSection || !state.settings) return;
+
+  const complete = isSetupComplete();
+  state.setupActive = !complete;
+  el.setupSection.hidden = complete;
+  el.settingsSection.hidden = !complete;
+  el.contentSection.hidden = !complete;
+
+  if (!complete) {
+    if (state.settingsOpen) setSettingsOpen(false);
+    el.recordToggle.disabled = true;
+    el.recordToggle.title = "Finish setup first";
+  } else {
+    const progress = state.downloadProgress[state.settings?.model];
+    el.recordToggle.disabled = Boolean(progress);
+    el.recordToggle.title = progress ? "Downloading model" : "Record";
+  }
+
+  const tasks = setupTasks();
+  const current = tasks.find((task) => !task.done)?.id || null;
+  for (const task of tasks) {
+    const target = el.setupTasks[task.id];
+    if (!target) continue;
+    const rowState = task.done ? "done" : task.id === current ? "current" : "waiting";
+    target.row.dataset.state = rowState;
+    target.row.disabled = task.busy;
+    target.detail.textContent = task.detail;
+    target.badge.textContent = task.busy && !task.done ? "Working" : task.badge;
+    target.row.title = task.detail;
+  }
+
+  const progress = state.downloadProgress[state.settings?.model];
+  el.setupDownloadTrack.hidden = !progress;
+  if (progress) {
+    const pct = Math.max(0, Math.min(100, progress.percent || 0));
+    el.setupDownloadFill.style.width = `${pct}%`;
+  } else {
+    el.setupDownloadFill.style.width = "0%";
+  }
+
+  const next = firstIncompleteSetupTask();
+  el.setupContinue.disabled = Boolean(state.setupBusyTask || setupTasks().some((task) => task.busy));
+  el.setupContinue.textContent = next ? setupActionLabel(next.id) : "Ready";
+  el.setupDetail.textContent = next
+    ? "Complete each task before the app opens."
+    : `Hold ${formatHotkey(state.settings?.hotkey || defaultHotkey)} to dictate.`;
+}
+
+function setupActionLabel(task) {
+  if (task === "model") return "Download model";
+  if (task === "microphone") return "Allow microphone";
+  if (task === "keyboard") return "Enable keyboard access";
+  return "Continue";
+}
+
+async function runNextSetupTask() {
+  const next = firstIncompleteSetupTask();
+  if (next) await runSetupTask(next.id);
+}
+
+async function runSetupTask(task) {
+  if (state.setupBusyTask) return;
+  const current = setupTasks().find((item) => item.id === task);
+  if (!current || current.done || current.busy) return;
+
+  state.setupBusyTask = task;
+  updateSetupUI();
+  try {
+    if (task === "model") {
+      await downloadSelectedModel();
+    } else if (task === "microphone") {
+      await grantMicPermission();
+      setTimeout(checkPermissions, 1000);
+    } else if (task === "keyboard") {
+      await grantAccessibilityPermission();
+    }
+  } finally {
+    state.setupBusyTask = null;
+    updateSetupUI();
+  }
 }
 
 // ── Permissions ──────────────────────────────────────────────
@@ -150,12 +325,17 @@ function needsPermissionAttention() {
 async function checkPermissions() {
   try {
     const perms = await invoke("check_permissions");
-    state.permissions = perms;
-    updatePermissionUI(perms);
-    updateSettingsDot();
+    applyPermissionState(perms);
   } catch (_) {
-    state.permissions = { microphone: "authorized", accessibility: true };
+    applyPermissionState({ microphone: "authorized", accessibility: true, input_monitoring: true });
   }
+}
+
+function applyPermissionState(perms) {
+  state.permissions = perms;
+  updatePermissionUI(perms);
+  updateSettingsDot();
+  updateSetupUI();
 }
 
 function updatePermissionUI(perms) {
@@ -168,10 +348,11 @@ function updatePermissionUI(perms) {
     if (b) b.textContent = ok ? "Granted" : perms.microphone === "not_determined" ? "Grant" : "Open Settings";
   }
   if (accRow) {
-    const ok = perms.accessibility;
+    const ok = keyboardAccessGranted();
     accRow.dataset.status = ok ? "granted" : "needed";
+    accRow.disabled = accessibilityRequestInFlight && !ok;
     const b = accRow.querySelector(".perm-badge");
-    if (b) b.textContent = ok ? "Granted" : "Open Settings";
+    if (b) b.textContent = ok ? "Granted" : accessibilityRequestInFlight ? "Requesting" : "Request";
   }
 }
 
@@ -186,8 +367,77 @@ async function grantMicPermission() {
 }
 
 async function grantAccessibilityPermission() {
-  await invoke("open_permission_settings", { pane: "accessibility" });
-  setTimeout(checkPermissions, 2000);
+  if (accessibilityRequestInFlight) return;
+
+  accessibilityRequestInFlight = true;
+  updatePermissionUI(state.permissions || { microphone: "authorized", accessibility: false, input_monitoring: false });
+  setStatus("idle", "Requesting keyboard access");
+
+  try {
+    const perms = await invoke("request_keyboard_permission");
+    applyPermissionState(perms);
+
+    if (perms?.accessibility && perms?.input_monitoring) {
+      finishAccessibilityRequest("Keyboard access granted");
+      return;
+    }
+
+    setStatus("idle", "Enable Mim TTS in Accessibility");
+    pollAccessibilityPermission(10, 1000);
+
+    setTimeout(async () => {
+      try {
+        const latest = await invoke("check_permissions");
+        applyPermissionState(latest);
+        if (!latest.accessibility) {
+          await invoke("open_permission_settings", { pane: "accessibility" });
+        } else if (!latest.input_monitoring) {
+          await invoke("open_permission_settings", { pane: "input_monitoring" });
+        }
+      } catch (_) {}
+    }, 2500);
+  } catch (error) {
+    setStatus("idle", String(error));
+  } finally {
+    setTimeout(() => {
+      accessibilityRequestInFlight = false;
+      updatePermissionUI(state.permissions || { microphone: "authorized", accessibility: false, input_monitoring: false });
+      updateSetupUI();
+    }, 3500);
+  }
+}
+
+function pollAccessibilityPermission(attempts, delayMs) {
+  if (accessibilityPollTimer) clearTimeout(accessibilityPollTimer);
+
+  const poll = async (remaining) => {
+    try {
+      const perms = await invoke("check_permissions");
+      applyPermissionState(perms);
+      if (perms.accessibility && perms.input_monitoring) {
+        finishAccessibilityRequest("Keyboard access granted");
+        return;
+      }
+    } catch (_) {}
+
+    if (remaining > 0) {
+      accessibilityPollTimer = setTimeout(() => poll(remaining - 1), delayMs);
+    }
+  };
+
+  accessibilityPollTimer = setTimeout(() => poll(attempts), delayMs);
+}
+
+function finishAccessibilityRequest(message) {
+  if (accessibilityPollTimer) {
+    clearTimeout(accessibilityPollTimer);
+    accessibilityPollTimer = null;
+  }
+  accessibilityRequestInFlight = false;
+  updatePermissionUI(state.permissions || { microphone: "authorized", accessibility: true, input_monitoring: true });
+  updateSetupUI();
+  setStatus("done", message);
+  setTimeout(() => setStatus("idle", idleStatusMessage()), 900);
 }
 
 // ── Recording ────────────────────────────────────────────────
@@ -198,6 +448,11 @@ async function toggleRecording() {
 
 async function startRecording() {
   try {
+    if (!isSetupComplete()) {
+      updateSetupUI();
+      setStatus("idle", "Set up Mim");
+      return;
+    }
     const selected = selectedModelStatus();
     if (!selected?.installed) {
       setStatus("idle", "Download model");
@@ -263,6 +518,7 @@ async function refreshModels() {
   renderModelOptions();
   updateModelGate();
   updateModelRowHighlight();
+  updateSetupUI();
 }
 
 function renderModelOptions() {
@@ -430,6 +686,7 @@ function applySettings(settings) {
   updateDetail();
   updateModelGate();
   updateModelRowHighlight();
+  updateSetupUI();
 }
 
 // ── Stats ────────────────────────────────────────────────────
@@ -498,11 +755,12 @@ async function downloadSelectedModel() {
   try {
     state.downloadProgress[model] = { model, percent: 0, bytes: 0 };
     updateModelGate();
+    updateSetupUI();
     await invoke("download_model", { model });
     delete state.downloadProgress[model];
     await refreshModels();
-    setStatus("done", "Ready");
-    setTimeout(() => setStatus("idle", "Ready"), 900);
+    setStatus("done", isSetupComplete() ? "Ready" : "Continue setup");
+    setTimeout(() => setStatus("idle", isSetupComplete() ? "Ready" : "Set up Mim"), 900);
   } catch (error) {
     delete state.downloadProgress[model];
     await refreshModels();
@@ -520,6 +778,10 @@ function updateModelGate() {
   el.modelGate.hidden = Boolean(installed);
   el.recordToggle.disabled = !installed || Boolean(progress);
   el.recordToggle.title = installed ? "Record" : "Download model first";
+  if (state.setupActive) {
+    el.recordToggle.disabled = true;
+    el.recordToggle.title = "Finish setup first";
+  }
 
   if (installed) {
     el.emptyHistory.hidden = false; el.historyList.hidden = false;
@@ -600,7 +862,7 @@ function statusDetail(status, message) {
   return (t === "Ready" || t === "Done") ? "" : t.length > 24 ? t : "";
 }
 
-function idleStatusMessage() { return selectedModelStatus()?.installed ? "Ready" : "Download model"; }
+function idleStatusMessage() { return isSetupComplete() ? "Ready" : "Set up Mim"; }
 
 function eventToHotkey(event) {
   const parts = [];

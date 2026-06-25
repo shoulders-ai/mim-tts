@@ -11,7 +11,9 @@ Mim records your voice, transcribes locally with Whisper, stores recent history,
 - Rust
 - CMake
 - Microphone permission
-- Accessibility permission for auto-paste and Fn/Globe hotkey capture
+- Keyboard permissions for auto-paste and the macOS Option hotkey. Use the in-app Keyboard access row first so macOS registers Mim TTS before opening Privacy & Security manually.
+- First launch uses a required setup checklist: download the default Base model, grant microphone access, and enable keyboard access before the main app appears.
+- Default hotkey is Option on macOS and F8 on Windows/Linux.
 
 ## Dev
 

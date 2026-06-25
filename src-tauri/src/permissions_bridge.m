@@ -1,5 +1,6 @@
 #import <AVFoundation/AVFoundation.h>
 #import <ApplicationServices/ApplicationServices.h>
+#import <CoreFoundation/CoreFoundation.h>
 #import <CoreAudio/CoreAudio.h>
 
 int mim_mic_permission_status(void) {
@@ -19,6 +20,33 @@ void mim_request_mic_permission(MimPermissionCallback callback) {
 
 int mim_accessibility_status(void) {
     return AXIsProcessTrusted() ? 1 : 0;
+}
+
+int mim_request_accessibility_permission(void) {
+    const void *keys[] = { kAXTrustedCheckOptionPrompt };
+    const void *values[] = { kCFBooleanTrue };
+    CFDictionaryRef options = CFDictionaryCreate(
+        kCFAllocatorDefault,
+        keys,
+        values,
+        1,
+        &kCFTypeDictionaryKeyCallBacks,
+        &kCFTypeDictionaryValueCallBacks
+    );
+
+    Boolean trusted = AXIsProcessTrustedWithOptions(options);
+    if (options) {
+        CFRelease(options);
+    }
+    return trusted ? 1 : 0;
+}
+
+int mim_input_monitoring_status(void) {
+    return CGPreflightListenEventAccess() ? 1 : 0;
+}
+
+int mim_request_input_monitoring_permission(void) {
+    return CGRequestListenEventAccess() ? 1 : 0;
 }
 
 static AudioObjectID mim_default_output_device(void) {

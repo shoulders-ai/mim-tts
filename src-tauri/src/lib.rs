@@ -6,8 +6,8 @@ mod models;
 mod paste;
 mod permissions;
 mod settings;
-mod system_audio;
 mod state;
+mod system_audio;
 mod transcribe;
 
 use tauri::{
@@ -21,8 +21,19 @@ use tauri_plugin_positioner::{Position, WindowExt};
 use state::AppState;
 
 const TRAY_ID: &str = "mim-tts-tray";
-const DEFAULT_SHORTCUT: &str = "CommandOrControl+Shift+Space";
-const FALLBACK_SHORTCUTS: &[&str] = &[DEFAULT_SHORTCUT, "F8", "F9", "Control+Shift+Space"];
+#[cfg(target_os = "macos")]
+const DEFAULT_SHORTCUT: &str = "Option";
+#[cfg(not(target_os = "macos"))]
+const DEFAULT_SHORTCUT: &str = "F8";
+#[cfg(target_os = "macos")]
+const FALLBACK_SHORTCUTS: &[&str] = &[
+    "CommandOrControl+Shift+Space",
+    "F8",
+    "F9",
+    "Control+Shift+Space",
+];
+#[cfg(not(target_os = "macos"))]
+const FALLBACK_SHORTCUTS: &[&str] = &[DEFAULT_SHORTCUT, "F9", "Control+Shift+Space"];
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -88,6 +99,8 @@ pub fn run() {
             commands::get_dictation_stats,
             commands::check_permissions,
             commands::request_mic_permission,
+            commands::request_accessibility_permission,
+            commands::request_keyboard_permission,
             commands::open_permission_settings,
         ])
         .run(tauri::generate_context!())
@@ -143,10 +156,16 @@ fn should_show_panel_on_start(app: &tauri::App) -> bool {
         .ok()
         .map(|settings| settings.model.clone());
 
-    model
+    let model_missing = model
         .as_deref()
         .map(|model| !models::is_installed(&state.app_dir, model).unwrap_or(false))
-        .unwrap_or(false)
+        .unwrap_or(false);
+    let permissions = permissions::check();
+
+    model_missing
+        || permissions.microphone != "authorized"
+        || !permissions.accessibility
+        || !permissions.input_monitoring
 }
 
 pub(crate) fn toggle_panel(app: &tauri::AppHandle) {
@@ -189,9 +208,12 @@ fn register_first_available_shortcut(app: &tauri::AppHandle) {
                 .map(|settings| settings.hotkey.clone())
         })
         .unwrap_or_else(|| DEFAULT_SHORTCUT.to_string());
+    let preferred = normalize_shortcut(&preferred);
 
-    if fn_hotkey::is_fn_hotkey(&preferred) {
-        let _ = app.global_shortcut().register(DEFAULT_SHORTCUT);
+    if fn_hotkey::is_modifier_hotkey(&preferred) {
+        if let Some(state) = app.try_state::<AppState>() {
+            let _ = state.update_hotkey(preferred.clone());
+        }
         return;
     }
 
@@ -213,20 +235,16 @@ pub(crate) fn replace_registered_shortcut(
     let next = normalize_shortcut(next);
     let current = normalize_shortcut(current);
 
-    if fn_hotkey::is_fn_hotkey(&next) {
-        if !fn_hotkey::is_fn_hotkey(&current) && current != DEFAULT_SHORTCUT {
+    if fn_hotkey::is_modifier_hotkey(&next) {
+        if !fn_hotkey::is_modifier_hotkey(&current) {
             let _ = app.global_shortcut().unregister(current.as_str());
         }
-        let _ = app.global_shortcut().register(DEFAULT_SHORTCUT);
-        return Ok("Fn".to_string());
+        return Ok(next);
     }
 
-    if fn_hotkey::is_fn_hotkey(&current) {
+    if fn_hotkey::is_modifier_hotkey(&current) {
         if !app.global_shortcut().is_registered(next.as_str()) {
             app.global_shortcut().register(next.as_str())?;
-        }
-        if next != DEFAULT_SHORTCUT {
-            let _ = app.global_shortcut().unregister(DEFAULT_SHORTCUT);
         }
         return Ok(next);
     }
@@ -255,7 +273,7 @@ fn shortcut_candidates(preferred: &str) -> Vec<String> {
 
 fn normalize_shortcut(shortcut: &str) -> String {
     let shortcut = shortcut.trim();
-    if let Some(shortcut) = fn_hotkey::normalize_fn_hotkey(shortcut) {
+    if let Some(shortcut) = fn_hotkey::normalize_modifier_hotkey(shortcut) {
         return shortcut;
     }
     if shortcut.is_empty() {
@@ -275,7 +293,7 @@ mod tests {
         assert_eq!(candidates.first().map(String::as_str), Some("F10"));
         assert!(candidates
             .iter()
-            .any(|candidate| candidate == DEFAULT_SHORTCUT));
+            .any(|candidate| FALLBACK_SHORTCUTS.contains(&candidate.as_str())));
     }
 
     #[test]
@@ -299,5 +317,7 @@ mod tests {
         assert_eq!(normalize_shortcut("fn"), "Fn");
         assert_eq!(normalize_shortcut("Globe"), "Fn");
         assert_eq!(normalize_shortcut("Function"), "Fn");
+        assert_eq!(normalize_shortcut("option"), "Option");
+        assert_eq!(normalize_shortcut("Alt"), "Option");
     }
 }

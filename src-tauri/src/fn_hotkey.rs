@@ -9,6 +9,7 @@ mod platform {
         ptr,
         sync::atomic::{AtomicBool, Ordering},
         thread,
+        time::Duration,
     };
 
     use serde::Serialize;
@@ -25,7 +26,10 @@ mod platform {
     const CG_EVENT_TAP_DISABLED_BY_USER_INPUT: u32 = 0xFFFF_FFFF;
     const CG_KEYBOARD_EVENT_KEYCODE: u32 = 9;
     const CG_EVENT_FLAG_SECONDARY_FN: u64 = 0x0080_0000;
+    const CG_EVENT_FLAG_ALTERNATE: u64 = 0x0008_0000;
     const VK_FUNCTION: i64 = 0x3F;
+    const VK_OPTION_LEFT: i64 = 0x3A;
+    const VK_OPTION_RIGHT: i64 = 0x3D;
 
     type CGEventTapCallback =
         unsafe extern "C" fn(*mut c_void, u32, *mut c_void, *mut c_void) -> *mut c_void;
@@ -43,11 +47,20 @@ mod platform {
     pub fn start(app: &tauri::AppHandle) {
         let app = app.clone();
         let _ = thread::Builder::new()
-            .name("fn-globe-hotkey".to_string())
-            .spawn(move || run_event_tap(app));
+            .name("modifier-hotkey".to_string())
+            .spawn(move || loop {
+                if !super::is_capturing() && configured_modifier(&app).is_none() {
+                    thread::sleep(Duration::from_secs(1));
+                    continue;
+                }
+
+                if !run_event_tap(app.clone()) {
+                    thread::sleep(Duration::from_secs(2));
+                }
+            });
     }
 
-    fn run_event_tap(app: tauri::AppHandle) {
+    fn run_event_tap(app: tauri::AppHandle) -> bool {
         let callback_state = Box::into_raw(Box::new(CallbackState {
             app,
             pressed: AtomicBool::new(false),
@@ -66,10 +79,8 @@ mod platform {
 
             if tap.is_null() {
                 drop(Box::from_raw(callback_state));
-                eprintln!(
-                    "Fn/Globe hotkey unavailable. Enable Accessibility/Input Monitoring permissions, then restart Mim TTS."
-                );
-                return;
+                eprintln!("Modifier hotkey unavailable. Enable Accessibility/Input Monitoring permissions.");
+                return false;
             }
 
             let source = CFMachPortCreateRunLoopSource(ptr::null(), tap, 0);
@@ -77,9 +88,9 @@ mod platform {
                 CFRelease(tap.cast());
                 drop(Box::from_raw(callback_state));
                 eprintln!(
-                    "Fn/Globe hotkey unavailable. Could not create event tap run loop source."
+                    "Modifier hotkey unavailable. Could not create event tap run loop source."
                 );
-                return;
+                return false;
             }
 
             let run_loop = CFRunLoopGetCurrent();
@@ -91,6 +102,7 @@ mod platform {
             CFRelease(tap.cast());
             drop(Box::from_raw(callback_state));
         }
+        true
     }
 
     unsafe extern "C" fn callback(
@@ -113,11 +125,14 @@ mod platform {
         let state = unsafe { &*(user_info.cast::<CallbackState>()) };
         let flags = unsafe { CGEventGetFlags(event) };
         let key_code = unsafe { CGEventGetIntegerValueField(event, CG_KEYBOARD_EVENT_KEYCODE) };
-        let down = flags & CG_EVENT_FLAG_SECONDARY_FN != 0;
-        let was_down = state.pressed.load(Ordering::SeqCst);
-        let relevant = key_code == VK_FUNCTION || down || was_down;
 
         if super::is_capturing() {
+            let Some(modifier) = modifier_from_event(flags, key_code) else {
+                return event;
+            };
+            let down = modifier.is_down(flags);
+            let was_down = state.pressed.load(Ordering::SeqCst);
+            let relevant = modifier.matches_key_code(key_code) || down || was_down;
             if relevant {
                 state.pressed.store(down, Ordering::SeqCst);
             }
@@ -126,18 +141,21 @@ mod platform {
                 let _ = state.app.emit(
                     "hotkey-captured",
                     CapturedHotkey {
-                        hotkey: "Fn".to_string(),
+                        hotkey: modifier.label().to_string(),
                     },
                 );
             }
             return event;
         }
 
-        if !is_fn_hotkey_enabled(&state.app) {
+        let Some(modifier) = configured_modifier(&state.app) else {
             state.pressed.store(false, Ordering::SeqCst);
             return event;
-        }
+        };
 
+        let down = modifier.is_down(flags);
+        let was_down = state.pressed.load(Ordering::SeqCst);
+        let relevant = modifier.matches_key_code(key_code) || down || was_down;
         if relevant && down != was_down {
             state.pressed.store(down, Ordering::SeqCst);
             let shortcut_state = if down {
@@ -151,16 +169,67 @@ mod platform {
         event
     }
 
-    fn is_fn_hotkey_enabled(app: &tauri::AppHandle) -> bool {
-        app.try_state::<AppState>()
-            .and_then(|state| {
-                state
-                    .settings
-                    .lock()
-                    .ok()
-                    .map(|settings| super::is_fn_hotkey(&settings.hotkey))
-            })
-            .unwrap_or(false)
+    #[derive(Debug, Clone, Copy)]
+    enum ModifierHotkey {
+        Fn,
+        Option,
+    }
+
+    impl ModifierHotkey {
+        fn label(self) -> &'static str {
+            match self {
+                Self::Fn => "Fn",
+                Self::Option => "Option",
+            }
+        }
+
+        fn flag(self) -> u64 {
+            match self {
+                Self::Fn => CG_EVENT_FLAG_SECONDARY_FN,
+                Self::Option => CG_EVENT_FLAG_ALTERNATE,
+            }
+        }
+
+        fn is_down(self, flags: u64) -> bool {
+            flags & self.flag() != 0
+        }
+
+        fn matches_key_code(self, key_code: i64) -> bool {
+            match self {
+                Self::Fn => key_code == VK_FUNCTION,
+                Self::Option => matches!(key_code, VK_OPTION_LEFT | VK_OPTION_RIGHT),
+            }
+        }
+    }
+
+    fn modifier_from_event(flags: u64, key_code: i64) -> Option<ModifierHotkey> {
+        if key_code == VK_FUNCTION || flags & CG_EVENT_FLAG_SECONDARY_FN != 0 {
+            Some(ModifierHotkey::Fn)
+        } else if matches!(key_code, VK_OPTION_LEFT | VK_OPTION_RIGHT)
+            || flags & CG_EVENT_FLAG_ALTERNATE != 0
+        {
+            Some(ModifierHotkey::Option)
+        } else {
+            None
+        }
+    }
+
+    fn configured_modifier(app: &tauri::AppHandle) -> Option<ModifierHotkey> {
+        app.try_state::<AppState>().and_then(|state| {
+            state
+                .settings
+                .lock()
+                .ok()
+                .and_then(|settings| modifier_from_setting(&settings.hotkey))
+        })
+    }
+
+    fn modifier_from_setting(value: &str) -> Option<ModifierHotkey> {
+        match super::normalize_modifier_hotkey(value)?.as_str() {
+            "Fn" => Some(ModifierHotkey::Fn),
+            "Option" => Some(ModifierHotkey::Option),
+            _ => None,
+        }
     }
 
     #[link(name = "ApplicationServices", kind = "framework")]
@@ -200,18 +269,15 @@ pub use platform::start;
 #[cfg(not(target_os = "macos"))]
 pub fn start(_app: &tauri::AppHandle) {}
 
-pub fn is_fn_hotkey(value: &str) -> bool {
-    matches!(
-        value.trim().to_ascii_lowercase().as_str(),
-        "fn" | "globe" | "function"
-    )
+pub fn is_modifier_hotkey(value: &str) -> bool {
+    normalize_modifier_hotkey(value).is_some()
 }
 
-pub fn normalize_fn_hotkey(value: &str) -> Option<String> {
-    if is_fn_hotkey(value) {
-        Some("Fn".to_string())
-    } else {
-        None
+pub fn normalize_modifier_hotkey(value: &str) -> Option<String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "fn" | "globe" | "function" => Some("Fn".to_string()),
+        "option" | "alt" => Some("Option".to_string()),
+        _ => None,
     }
 }
 

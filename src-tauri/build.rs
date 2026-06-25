@@ -1,4 +1,6 @@
 fn main() {
+    println!("cargo:rerun-if-changed=src/permissions_bridge.m");
+
     tauri_build::build();
 
     #[cfg(target_os = "macos")]

@@ -23,7 +23,49 @@
         </button>
       </header>
 
-      <section class="settings-section">
+      <section id="setup-section" class="setup-section" hidden>
+        <div class="setup-head">
+          <div class="setup-title">Set up Mim</div>
+          <div id="setup-detail" class="setup-detail">Finish these steps before dictation starts.</div>
+        </div>
+
+        <div class="setup-list" role="list">
+          <button id="setup-model" class="setup-task" type="button">
+            <span class="setup-index">1</span>
+            <span class="setup-copy">
+              <span class="setup-task-title">Download speech model</span>
+              <span id="setup-model-detail" class="setup-task-detail">Base, recommended</span>
+            </span>
+            <span id="setup-model-badge" class="setup-badge">Needed</span>
+          </button>
+
+          <button id="setup-mic" class="setup-task" type="button">
+            <span class="setup-index">2</span>
+            <span class="setup-copy">
+              <span class="setup-task-title">Allow microphone</span>
+              <span id="setup-mic-detail" class="setup-task-detail">Required to record</span>
+            </span>
+            <span id="setup-mic-badge" class="setup-badge">Needed</span>
+          </button>
+
+          <button id="setup-keyboard" class="setup-task" type="button">
+            <span class="setup-index">3</span>
+            <span class="setup-copy">
+              <span class="setup-task-title">Enable keyboard access</span>
+              <span id="setup-keyboard-detail" class="setup-task-detail">Required for Option and paste</span>
+            </span>
+            <span id="setup-keyboard-badge" class="setup-badge">Needed</span>
+          </button>
+        </div>
+
+        <div id="setup-download-track" class="setup-download-track" hidden>
+          <span id="setup-download-fill"></span>
+        </div>
+
+        <button id="setup-continue" class="setup-continue" type="button">Start setup</button>
+      </section>
+
+      <section id="settings-section" class="settings-section">
         <button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false">
           <span class="chevron" aria-hidden="true">›</span>
           <span>Settings</span>
@@ -36,7 +78,7 @@
             <span class="setting-label">Model</span>
             <div class="setting-picker model-picker">
               <button id="model-button" class="setting-value" type="button" aria-haspopup="listbox" aria-expanded="false">
-                <span id="model-value">tiny · ready</span>
+                <span id="model-value">base · ready</span>
               </button>
               <div id="model-menu" class="dropdown-menu model-menu" hidden>
                 <div id="model-list" class="dropdown-list" role="listbox" aria-label="Models"></div>
@@ -59,7 +101,7 @@
           <div class="setting-row">
             <span class="setting-label">Hotkey</span>
             <button id="hotkey-record" class="setting-hotkey" type="button">
-              <span id="hotkey-value" class="hotkey-keys">Command+Shift+Space</span>
+              <span id="hotkey-value" class="hotkey-keys">Option</span>
               <span id="hotkey-action" class="hotkey-tag">rec</span>
             </button>
           </div>
@@ -91,13 +133,13 @@
           </button>
           <button id="perm-acc" class="setting-row setting-perm" type="button">
             <span class="setting-label">Keyboard access</span>
-            <span class="perm-badge">Open Settings</span>
+            <span class="perm-badge">Request</span>
           </button>
 
         </div>
       </section>
 
-      <section class="content-section">
+      <section id="content-section" class="content-section">
         <div id="model-gate" class="model-gate" hidden>
           <div>
             <div id="model-gate-title" class="model-gate-title">Download model</div>

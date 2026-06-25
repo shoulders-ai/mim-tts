@@ -50,9 +50,12 @@ pub fn paste_text(app: &AppHandle, text: &str) -> anyhow::Result<PasteOutcome> {
 
 fn simulate_cmd_v() -> anyhow::Result<()> {
     if !accessibility_is_trusted() {
-        return Err(anyhow::anyhow!(
-            "Accessibility permission is not enabled for keyboard automation"
-        ));
+        let status = crate::permissions::request_accessibility();
+        if !status.accessibility {
+            return Err(anyhow::anyhow!(
+                "Accessibility permission is not enabled for keyboard automation"
+            ));
+        }
     }
 
     simulate_paste_shortcut()
