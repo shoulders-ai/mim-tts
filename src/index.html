@@ -9,6 +9,7 @@
   </head>
   <body class="panel-shell">
     <main class="panel" data-state="idle">
+
       <header class="panel-header">
         <div class="status-cluster">
           <span class="status-dot" aria-hidden="true"></span>
@@ -22,70 +23,85 @@
         </button>
       </header>
 
-      <section class="control-stack" aria-label="Dictation controls">
-        <div class="control-grid">
-          <div class="field model-picker">
-            <span>Model</span>
-            <button id="model-button" class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false">
-              <span id="model-value">tiny</span>
-            </button>
-            <div id="model-menu" class="model-menu" hidden>
-              <div id="model-list" class="model-list" role="listbox" aria-label="Models"></div>
+      <section class="settings-section">
+        <button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false">
+          <span class="chevron" aria-hidden="true">›</span>
+          <span>Settings</span>
+          <span id="settings-dot" class="settings-dot" hidden></span>
+        </button>
+
+        <div id="settings-body" class="settings-body" hidden>
+
+          <div class="setting-row" id="model-row">
+            <span class="setting-label">Model</span>
+            <div class="setting-picker model-picker">
+              <button id="model-button" class="setting-value" type="button" aria-haspopup="listbox" aria-expanded="false">
+                <span id="model-value">tiny · ready</span>
+              </button>
+              <div id="model-menu" class="dropdown-menu model-menu" hidden>
+                <div id="model-list" class="dropdown-list" role="listbox" aria-label="Models"></div>
+              </div>
             </div>
           </div>
-          <div class="field language-picker">
-            <span>Lang</span>
-            <button id="language-button" class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false">
-              <span id="language-value">de/en</span>
-            </button>
-            <div id="language-menu" class="language-menu" hidden>
-              <div id="language-list" class="language-list" role="listbox" aria-label="Languages"></div>
+
+          <div class="setting-row">
+            <span class="setting-label">Language</span>
+            <div class="setting-picker language-picker">
+              <button id="language-button" class="setting-value" type="button" aria-haspopup="listbox" aria-expanded="false">
+                <span id="language-value">de/en</span>
+              </button>
+              <div id="language-menu" class="dropdown-menu language-menu" hidden>
+                <div id="language-list" class="dropdown-list language-grid" role="listbox" aria-label="Languages"></div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="preference-row">
-          <button id="hotkey-record" class="hotkey-record" type="button">
-            <span>
-              <span class="control-eyebrow">Hotkey</span>
-              <span id="hotkey-value">Command+Shift+Space</span>
-            </span>
-            <span id="hotkey-action">Record</span>
-          </button>
-          <div class="segmented inline-segmented" role="group" aria-label="Activation mode">
-            <button id="mode-hold" type="button" data-mode="hold">Hold</button>
-            <button id="mode-toggle" type="button" data-mode="toggle">Tap</button>
+          <div class="setting-row">
+            <span class="setting-label">Hotkey</span>
+            <button id="hotkey-record" class="setting-hotkey" type="button">
+              <span id="hotkey-value" class="hotkey-keys">Command+Shift+Space</span>
+              <span id="hotkey-action" class="hotkey-tag">rec</span>
+            </button>
           </div>
-        </div>
 
-        <div class="option-list">
-          <button id="auto-paste-toggle" class="option-row" type="button" aria-pressed="true">
-            <span class="option-label">Paste after dictation</span>
-            <span class="option-switch"></span>
+          <div class="setting-row">
+            <span class="setting-label">Activation</span>
+            <div class="seg-mini" role="group" aria-label="Activation mode">
+              <button id="mode-hold" type="button" aria-pressed="true">Hold</button>
+              <button id="mode-toggle" type="button" aria-pressed="false">Tap</button>
+            </div>
+          </div>
+
+          <div class="setting-divider"></div>
+
+          <button id="auto-paste-toggle" class="setting-row setting-btn" type="button" aria-pressed="true">
+            <span class="setting-label">Paste after dictation</span>
+            <span class="sw"></span>
           </button>
-          <button id="audio-cues-toggle" class="option-row" type="button" aria-pressed="true">
-            <span class="option-label">Play sound effects</span>
-            <span class="option-switch"></span>
+          <button id="audio-cues-toggle" class="setting-row setting-btn" type="button" aria-pressed="true">
+            <span class="setting-label">Play sound effects</span>
+            <span class="sw"></span>
           </button>
-          <button id="mute-toggle" class="option-row" type="button" aria-pressed="false">
-            <span class="option-label">Mute audio while recording</span>
-            <span class="option-switch"></span>
+          <button id="mute-toggle" class="setting-row setting-btn" type="button" aria-pressed="false">
+            <span class="setting-label">Mute while recording</span>
+            <span class="sw"></span>
           </button>
 
-          <div class="option-divider"></div>
+          <div class="setting-divider"></div>
 
-          <button id="perm-mic" class="option-row option-perm" type="button">
-            <span class="option-label">Microphone access</span>
+          <button id="perm-mic" class="setting-row setting-perm" type="button">
+            <span class="setting-label">Microphone access</span>
             <span class="perm-badge">Grant</span>
           </button>
-          <button id="perm-acc" class="option-row option-perm" type="button">
-            <span class="option-label">Keyboard access</span>
+          <button id="perm-acc" class="setting-row setting-perm" type="button">
+            <span class="setting-label">Keyboard access</span>
             <span class="perm-badge">Open Settings</span>
           </button>
+
         </div>
       </section>
 
-      <section class="lower-section">
+      <section class="content-section">
         <div id="model-gate" class="model-gate" hidden>
           <div>
             <div id="model-gate-title" class="model-gate-title">Download model</div>
@@ -99,12 +115,12 @@
         </div>
 
         <div id="stats-section" class="stats-section" hidden>
-          <div class="section-header">30-day stats</div>
-          <div id="dictation-stats" class="dictation-stats-row"></div>
+          <div class="section-label">30-day stats</div>
+          <div id="dictation-stats" class="stats-row"></div>
         </div>
 
         <div class="history-section">
-          <div class="section-header">
+          <div class="section-label">
             Transcriptions
             <span class="section-hint">click to copy</span>
           </div>
