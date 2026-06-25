@@ -68,8 +68,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   el.settingsToggle.addEventListener("click", toggleSettings);
   el.recordToggle.addEventListener("click", toggleRecording);
   el.modelDownloadButton.addEventListener("click", downloadSelectedModel);
-  el.modelButton.addEventListener("click", (e) => { e.stopPropagation(); closeAllDropdowns(); setModelMenuOpen(!state.modelOpen); });
-  el.languageButton.addEventListener("click", (e) => { e.stopPropagation(); closeAllDropdowns(); setLanguageMenuOpen(!state.languageOpen); });
+  el.modelButton.addEventListener("click", (e) => { e.stopPropagation(); const open = !state.modelOpen; closeAllDropdowns(); if (open) setModelMenuOpen(true); });
+  el.languageButton.addEventListener("click", (e) => { e.stopPropagation(); const open = !state.languageOpen; closeAllDropdowns(); if (open) setLanguageMenuOpen(true); });
   el.hotkeyRecord.addEventListener("click", startHotkeyCapture);
   el.modeHold.addEventListener("click", () => setActivationMode("hold"));
   el.modeToggle.addEventListener("click", () => setActivationMode("toggle"));
